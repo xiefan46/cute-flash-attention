@@ -78,9 +78,10 @@ __global__ void flash_forward(void* output, const void* q, const void* k,
   auto tVgV = gmem_thr_copy_QKV.partition_S(gV(_, _, 0));
   auto tVsV = gmem_thr_copy_QKV.partition_D(sV);
 
-
-  print(tQgQ);
-
+  if (thread0()) {
+    print_layout(tQgQ);
+    print_layout(tQsQ);
+  }
   TiledMMA tiled_mma;
   auto thr_mma = tiled_mma.get_slice(tidx);
   auto tSrQ = thr_mma.partition_fragment_A(sQ);             // (MMA,MMA_M,MMA_K)
