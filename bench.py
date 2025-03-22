@@ -30,7 +30,7 @@ myflash = load(name='myflash',
                     sources=[
                         'main.cpp', 
                         'flash.cu',
-                        'flash_no_softmax.cu'
+                        # 'flash_no_softmax.cu'
                     ], 
                     extra_cuda_cflags=[
                         '-O2', 
