@@ -3,8 +3,8 @@ import math
 import torch
 from torch.utils.cpp_extension import load
 from torch.nn import functional as F
-from flashinfer import single_prefill_with_kv_cache
-from flash_attn import flash_attn_func
+# from flashinfer import single_prefill_with_kv_cache
+# from flash_attn import flash_attn_func
 
 # Add a new environment variable  
 os.environ['TORCH_CUDA_ARCH_LIST'] = '8.0'
@@ -72,4 +72,7 @@ v2 = v.reshape(batch_size * kv_len, n_head, head_embd)
 
 a = manual_attn(q1, k1, v1, use_softmax=False)
 b = myflash.forward_no_softmax(q1, k1, v1)
+
+print(f"a: {a}")
+print(f"a: {b}")
 print('attn values sanity check:', torch.allclose(a, b, rtol=1e-03, atol=1e-03))
