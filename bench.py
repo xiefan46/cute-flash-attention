@@ -34,8 +34,8 @@ myflash = load(name='myflash',
                         '-lcublas', 
                         '-lcublasLt', 
                         '-std=c++17', 
-                        '-I/mnt/d/cuda/cutlass/include', 
-                        '-I/mnt/d/cuda/cutlass/tools/util/include', 
+                        '-I/root/cutlass/include',
+                        '-I/root/cutlass/tools/util/include',
                     ], 
                 )
 
