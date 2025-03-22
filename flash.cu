@@ -4,6 +4,8 @@
 #include <torch/types.h>
 
 #include <cute/tensor.hpp>
+#include "util.h"
+
 
 template <typename config>
 __global__ void flash_forward(void* output, const void* q, const void* k,
