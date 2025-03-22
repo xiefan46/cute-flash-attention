@@ -3,6 +3,8 @@ import math
 import torch
 from torch.utils.cpp_extension import load
 from torch.nn import functional as F
+import random
+import numpy as np
 # from flashinfer import single_prefill_with_kv_cache
 # from flash_attn import flash_attn_func
 
@@ -49,6 +51,31 @@ def manual_attn(q, k, v, attn_mask=None, use_softmax = True):
     y = att @ v
     return y
 
+def set_seed(seed=42):
+    # Python 随机模块
+    random.seed(seed)
+
+    # NumPy
+    np.random.seed(seed)
+
+    # PyTorch CPU
+    torch.manual_seed(seed)
+
+    # PyTorch GPU（如果有）
+    if torch.cuda.is_available():
+        torch.cuda.manual_seed(seed)
+        torch.cuda.manual_seed_all(seed)  # 多GPU时设置所有种子
+
+        # cuDNN 确定性模式（可能影响性能）
+        torch.backends.cudnn.deterministic = True
+        torch.backends.cudnn.benchmark = False  # 关闭自动寻找最优卷积算法
+
+    # 设置环境变量（针对某些CUDA版本）
+    os.environ['PYTHONHASHSEED'] = str(seed)
+    os.environ['CUBLAS_WORKSPACE_CONFIG'] = ':4096:8'  # 针对某些CUDA操作
+
+
+set_seed(10086)
 batch_size = 1
 n_head = 32
 q_len = 1024 
