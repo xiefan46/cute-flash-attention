@@ -6,7 +6,7 @@
 #include <cute/tensor.hpp>
 
 template <typename config>
-__global__ void flash_forward_no_softmax(void* output, const void* q, const void* k,
+__global__ void flash_forward(void* output, const void* q, const void* k,
                               const void* v, int head_stride, int q_len,
                               int k_len, float sm_scale) {
   using namespace cute;
@@ -131,18 +131,18 @@ __global__ void flash_forward_no_softmax(void* output, const void* q, const void
   // ((2,2),MMA_M,MMA_K)
   auto rAccOut =
       partition_fragment_C(tiled_mma, Shape<Int<kBlockM>, Int<kHeadDim>>{});
-//  auto scores_max =
-//      make_tensor<float>(Shape<Int<2 * size<1>(rAccOut)>>{});  // (2*MMA_M)
-//  auto scores_sum = make_fragment_like(scores_max);
+  auto scores_max =
+      make_tensor<float>(Shape<Int<2 * size<1>(rAccOut)>>{});  // (2*MMA_M)
+  auto scores_sum = make_fragment_like(scores_max);
   auto rAccScore = partition_fragment_C(
       tiled_mma, make_shape(Int<kBlockM>{}, Int<kBlockN>{}));
   clear(rAccOut);
-//  // init scores_max, scores_sum
-//#pragma unroll
-//  for (int ii = 0; ii < size(scores_max); ii++) {
-//    scores_max(ii) = float(-5e4);
-//    scores_sum(ii) = 0;
-//  }
+  // init scores_max, scores_sum
+#pragma unroll
+  for (int ii = 0; ii < size(scores_max); ii++) {
+    scores_max(ii) = float(-5e4);
+    scores_sum(ii) = 0;
+  }
 
   // ((2,2),MMA_M,MMA_N) to ((2,MMA_M),(2,MMA_N))
   auto ol = logical_divide(rAccOut.layout(), Shape<Int<2>>{});
@@ -184,38 +184,37 @@ __global__ void flash_forward_no_softmax(void* output, const void* q, const void
     auto scores = make_tensor(rAccScore.data(), rAccScore_new_layout);
 
     // softmax
-//    auto scores_max_pre = make_fragment_like(scores_max);
-//    cute::copy(scores_max, scores_max_pre);
+    auto scores_max_pre = make_fragment_like(scores_max);
+    cute::copy(scores_max, scores_max_pre);
 #pragma unroll
     for (int si = 0; si < size<0>(scores); si++) {
-//      float& scores_max_si = scores_max(si);
+      float& scores_max_si = scores_max(si);
       float& scores_sum_si = scores_sum(si);
-//#pragma unroll
-//      for (int sj = 0; sj < size<1>(scores); sj++) {
-//        scores_max_si = max(scores_max_si, scores(si, sj));
-//      }
-//      scores_max_si =
-//          max(scores_max_si, __shfl_xor_sync(0xffffffff, scores_max_si, 0x2));
-//      scores_max_si =
-//          max(scores_max_si, __shfl_xor_sync(0xffffffff, scores_max_si, 0x1));
-//
-//      float scores_scale = exp2f(scores_max_pre(si) - scores_max_si);
-//#pragma unroll
-//      for (int sj = 0; sj < size<1>(rAccOut_new); sj++) {
-//        rAccOut_new(si, sj) *= scores_scale;
-//      }
+#pragma unroll
+      for (int sj = 0; sj < size<1>(scores); sj++) {
+        scores_max_si = max(scores_max_si, scores(si, sj));
+      }
+      scores_max_si =
+          max(scores_max_si, __shfl_xor_sync(0xffffffff, scores_max_si, 0x2));
+      scores_max_si =
+          max(scores_max_si, __shfl_xor_sync(0xffffffff, scores_max_si, 0x1));
 
-//      float scores_sum_cur_si = 0;
-//#pragma unroll
-//      for (int sj = 0; sj < size<1>(scores); sj++) {
-//        // scores(si, sj) = exp2f(scores(si, sj) - scores_max_si);
-//        scores_sum_cur_si += scores(si, sj);
-//      }
-//      scores_sum_cur_si += __shfl_xor_sync(0xffffffff, scores_sum_cur_si, 0x2);
-//      scores_sum_cur_si += __shfl_xor_sync(0xffffffff, scores_sum_cur_si, 0x1);
-//      // scores_sum_si = scores_sum_si * scores_scale + scores_sum_cur_si;
-//      scores_sum_si += scores_sum_cur_si
-//    }
+      float scores_scale = exp2f(scores_max_pre(si) - scores_max_si);
+#pragma unroll
+      for (int sj = 0; sj < size<1>(rAccOut_new); sj++) {
+        rAccOut_new(si, sj) *= scores_scale;
+      }
+
+      float scores_sum_cur_si = 0;
+#pragma unroll
+      for (int sj = 0; sj < size<1>(scores); sj++) {
+        scores(si, sj) = exp2f(scores(si, sj) - scores_max_si);
+        scores_sum_cur_si += scores(si, sj);
+      }
+      scores_sum_cur_si += __shfl_xor_sync(0xffffffff, scores_sum_cur_si, 0x2);
+      scores_sum_cur_si += __shfl_xor_sync(0xffffffff, scores_sum_cur_si, 0x1);
+      scores_sum_si = scores_sum_si * scores_scale + scores_sum_cur_si;
+    }
 
     __syncthreads();
     // advance k
@@ -268,18 +267,18 @@ __global__ void flash_forward_no_softmax(void* output, const void* q, const void
     cp_async_fence();
   }
 
-//  // normalize d
-//#pragma unroll
-//  for (int si = 0; si < size(scores_sum); si++) {
-//    scores_sum(si) = __frcp_rn(scores_sum(si));
-//  }
-//#pragma unroll
-//  for (int oi = 0; oi < size<0>(rAccOut_new); oi++) {
-//#pragma unroll
-//    for (int oj = 0; oj < size<1>(rAccOut_new); oj++) {
-//      rAccOut_new(oi, oj) *= scores_sum(oi);
-//    }
-//  }
+  // normalize d
+#pragma unroll
+  for (int si = 0; si < size(scores_sum); si++) {
+    scores_sum(si) = __frcp_rn(scores_sum(si));
+  }
+#pragma unroll
+  for (int oi = 0; oi < size<0>(rAccOut_new); oi++) {
+#pragma unroll
+    for (int oj = 0; oj < size<1>(rAccOut_new); oj++) {
+      rAccOut_new(oi, oj) *= scores_sum(oi);
+    }
+  }
 
   // write back
   auto rAccOut_fp16 = make_tensor_like<half_t>(rAccOut);
@@ -393,7 +392,7 @@ struct FlashConfig {
 
 }  // namespace config
 
-torch::Tensor forward_no_softmax(torch::Tensor q, torch::Tensor k, torch::Tensor v) {
+torch::Tensor forward(torch::Tensor q, torch::Tensor k, torch::Tensor v) {
   int bs = q.size(0);
   int head_num = q.size(1);
   int q_len = q.size(2);
@@ -411,7 +410,7 @@ torch::Tensor forward_no_softmax(torch::Tensor q, torch::Tensor k, torch::Tensor
   dim3 block = config.kThreadNum;
   dim3 grid((q_len + config.kBlockM - 1) / config.kBlockM, bs * head_num);
   int shm_size = config.kShmSize;
-  auto partition_kernel = flash_forward_no_softmax<decltype(config)>;
+  auto partition_kernel = flash_forward<decltype(config)>;
   cudaFuncSetAttribute(partition_kernel,
                        cudaFuncAttributeMaxDynamicSharedMemorySize, shm_size);
   partition_kernel<<<grid, block, shm_size>>>(
