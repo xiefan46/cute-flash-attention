@@ -5,6 +5,8 @@
 
 #include <cute/tensor.hpp>
 
+using namespace cute;
+
 #define PRINT(name, content) \
 print(name);             \
 print(" : ");            \
