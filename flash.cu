@@ -13,6 +13,13 @@ print(" : ");            \
 print(content);          \
 print("\n");
 
+
+#define PRINT_LAYOUT(name, content) \
+  print(name); \
+  print(" : "); \
+  print_layout(content); \
+  print("\n");
+
 template <typename config>
 __global__ void flash_forward(void* output, const void* q, const void* k,
                               const void* v, int head_stride, int q_len,
@@ -58,6 +65,8 @@ __global__ void flash_forward(void* output, const void* q, const void* k,
       PRINT("SmemLayoutK", SmemLayoutK{}.shape());
       PRINT("SmemLayoutV", SmemLayoutV{}.shape());
       PRINT("SmemLayoutO", SmemLayoutO{}.shape());
+
+      PRINT_LAYOUT("SmemLayoutQ", SmemLayoutQ{})
   }
 
 
