@@ -7,6 +7,12 @@
 #include "util.h"
 
 
+#define PRINT(name, content) \
+print(name);             \
+print(" : ");            \
+print(content);          \
+print("\n");
+
 template <typename config>
 __global__ void flash_forward(void* output, const void* q, const void* k,
                               const void* v, int head_stride, int q_len,
@@ -114,6 +120,11 @@ __global__ void flash_forward(void* output, const void* q, const void* k,
   // multiply sm scale
   half2 sm_half2 = {__float2half_rn(sm_scale), __float2half_rn(sm_scale)};
   auto tQsQ_int4 = recast<int4>(tQsQ);
+
+  if (thread0()) {
+    PRINT(tQsQ_int4.shape());
+  }
+
 #pragma unroll
   for (int ii = 0; ii < size(tQsQ_int4); ii++) {
     auto tmp = tQsQ_int4(ii);
@@ -418,7 +429,11 @@ torch::Tensor forward(torch::Tensor q, torch::Tensor k, torch::Tensor v) {
   auto partition_kernel = flash_forward<decltype(config)>;
   cudaFuncSetAttribute(partition_kernel,
                        cudaFuncAttributeMaxDynamicSharedMemorySize, shm_size);
-  partition_kernel<<<grid, block, shm_size>>>(
+//  partition_kernel<<<grid, block, shm_size>>>(
+//      (void*)out.data_ptr(), (const void*)q.data_ptr(),
+//      (const void*)k.data_ptr(), (const void*)v.data_ptr(), head_stride, q_len,
+//      k_len, sm_scale);
+  partition_kernel<<<1, 128, shm_size>>>(
       (void*)out.data_ptr(), (const void*)q.data_ptr(),
       (const void*)k.data_ptr(), (const void*)v.data_ptr(), head_stride, q_len,
       k_len, sm_scale);
