@@ -137,6 +137,8 @@ __global__ void flash_forward(void* output, const void* q, const void* k,
   auto tVgV = gmem_thr_copy_QKV.partition_S(gV(_, _, 0));
   auto tVsV = gmem_thr_copy_QKV.partition_D(sV);
 
+
+  // size_per_thread = block_size / thread_num = 64 * 64 / 128 = 32
   if (thread0()) {
     PRINT("tQgQ", tQgQ);
     PRINT("size tQgQ", size(tQgQ));
@@ -158,6 +160,16 @@ __global__ void flash_forward(void* output, const void* q, const void* k,
   auto tSrQ = thr_mma.partition_fragment_A(sQ);             // (MMA,MMA_M,MMA_K)
   auto tSrK = thr_mma.partition_fragment_B(sK);             // (MMA,MMA_N,MMA_K)
   auto tOrVt = thr_mma.partition_fragment_B(sVtNoSwizzle);  // (MMA,MMA_K,MMA_N)
+
+  if (thread0()) {
+    PRINT("tSrQ", tSrQ);
+    PRINT("size tSrQ", size(tSrQ));
+    PRINT("tSrK", tSrK);
+    PRINT("size tSrK", size(tSrK));
+    PRINT("tOrVt", tOrVt);
+    PRINT("size tOrVt", size(tOrVt));
+  }
+
 
   auto smem_tiled_copy_Q = make_tiled_copy_A(SmemCopyAtom{}, tiled_mma);
   auto smem_thr_copy_Q = smem_tiled_copy_Q.get_thread_slice(tidx);
