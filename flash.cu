@@ -428,7 +428,11 @@ torch::Tensor forward(torch::Tensor q, torch::Tensor k, torch::Tensor v) {
 //      (void*)out.data_ptr(), (const void*)q.data_ptr(),
 //      (const void*)k.data_ptr(), (const void*)v.data_ptr(), head_stride, q_len,
 //      k_len, sm_scale);
-  partition_kernel<<<1, 128, shm_size>>>(
+
+  PRINT("grid", grid);
+  PRINT("block", block);
+
+  partition_kernel<<<grid, config.kThreadNum, shm_size>>>(
       (void*)out.data_ptr(), (const void*)q.data_ptr(),
       (const void*)k.data_ptr(), (const void*)v.data_ptr(), head_stride, q_len,
       k_len, sm_scale);

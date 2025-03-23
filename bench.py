@@ -77,8 +77,8 @@ def set_seed(seed=42):
 
 set_seed(10086)
 batch_size = 1
-n_head = 32
-q_len = 1024 
+n_head = 1
+q_len = 64
 kv_len = q_len
 head_embd = 64 
 
