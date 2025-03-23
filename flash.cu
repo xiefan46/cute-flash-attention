@@ -48,6 +48,19 @@ __global__ void flash_forward(void* output, const void* q, const void* k,
 
   const int bs_head_offset = base_id * head_stride;
 
+  if (thread0()) {
+      PRINT("kBlockM", kBlockM);
+      PRINT("kBlockN", kBlockN);
+      PRINT("kHeadDim", kHeadDim);
+      PRINT("head_stride", head_stride);
+      PRINT("bs_head_offset", bs_head_offset);
+      PRINT("SmemLayoutQ", SmemLayoutQ{}.shape());
+      PRINT("SmemLayoutK", SmemLayoutK{}.shape());
+      PRINT("SmemLayoutV", SmemLayoutV{}.shape());
+      PRINT("SmemLayoutO", SmemLayoutO{}.shape());
+  }
+
+
   auto Q = make_tensor(make_gmem_ptr<half_t>((T*)q + bs_head_offset),
                        make_shape(q_len, Int<kHeadDim>{}),
                        make_stride(Int<kHeadDim>{}, Int<1>{}));
@@ -434,7 +447,7 @@ torch::Tensor forward(torch::Tensor q, torch::Tensor k, torch::Tensor v) {
   PRINT("grid", grid);
   PRINT("block", block);
 
-  partition_kernel<<<grid, config.kThreadNum, shm_size>>>(
+  partition_kernel<<<grid, block, shm_size>>>(
       (void*)out.data_ptr(), (const void*)q.data_ptr(),
       (const void*)k.data_ptr(), (const void*)v.data_ptr(), head_stride, q_len,
       k_len, sm_scale);
