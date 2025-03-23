@@ -139,11 +139,17 @@ __global__ void flash_forward(void* output, const void* q, const void* k,
 
   if (thread0()) {
     PRINT("tQgQ", tQgQ);
+    PRINT("size tQgQ", size(tQgQ));
     PRINT("tQsQ", tQsQ);
+    PRINT("size tQsQ", size(tQsQ));
     PRINT("tKgK", tKgK);
+    PRINT("size tKgK", size(tKgK));
     PRINT("tKsK", tKsK);
+    PRINT("size tKsK", size(tKsK));
     PRINT("tVgV", tVgV);
+    PRINT("size tVgV", size(tVgV));
     PRINT("tVsV", tVsV);
+    PRINT("size tVsV", size(tVsV));
   }
 
 
