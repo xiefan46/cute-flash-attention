@@ -105,6 +105,12 @@ __global__ void flash_forward(void* output, const void* q, const void* k,
   auto gV = local_tile(V, make_tile(Int<kBlockN>{}, Int<kHeadDim>{}),
                        make_coord(0, _));
 
+  if (thread0()) {
+    PRINT("gQ", gQ);
+    PRINT("gK", gK);
+    PRINT("gV", gV);
+  }
+
   auto sQ = make_tensor(make_smem_ptr<half_t>(q_shm), SmemLayoutQ{});
   auto sK = make_tensor(make_smem_ptr<half_t>(k_shm), SmemLayoutK{});
   auto sV = make_tensor(make_smem_ptr<half_t>(v_shm), SmemLayoutV{});
@@ -114,6 +120,14 @@ __global__ void flash_forward(void* output, const void* q, const void* k,
   auto sVtNoSwizzle =
       make_tensor(make_smem_ptr<half_t>(v_shm), SmemLayoutVtNoSwizzle{});
 
+  if (thread0()) {
+    PRINT("sQ", sQ);
+    PRINT("sK", sK);
+    PRINT("sV", sV);
+    PRINT("sVt", sVt);
+    PRINT("sVtNoSwizzle", sVtNoSwizzle);
+  }
+
   GmemTiledCopyQKV gmem_tiled_copy_QKV;
   auto gmem_thr_copy_QKV = gmem_tiled_copy_QKV.get_thread_slice(tidx);
   auto tQgQ = gmem_thr_copy_QKV.partition_S(gQ(_, _, 0));
@@ -122,6 +136,16 @@ __global__ void flash_forward(void* output, const void* q, const void* k,
   auto tKsK = gmem_thr_copy_QKV.partition_D(sK);
   auto tVgV = gmem_thr_copy_QKV.partition_S(gV(_, _, 0));
   auto tVsV = gmem_thr_copy_QKV.partition_D(sV);
+
+  if (thread0()) {
+    PRINT("tQgQ", tQgQ);
+    PRINT("tQsQ", tQsQ);
+    PRINT("tKgK", tKgK);
+    PRINT("tKsK", tKsK);
+    PRINT("tVgV", tVgV);
+    PRINT("tVsV", tVsV);
+  }
+
 
   TiledMMA tiled_mma;
   auto thr_mma = tiled_mma.get_slice(tidx);
