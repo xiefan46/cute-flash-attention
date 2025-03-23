@@ -4,8 +4,6 @@
 #include <torch/types.h>
 
 #include <cute/tensor.hpp>
-#include "util.h"
-
 
 #define PRINT(name, content) \
 print(name);             \
