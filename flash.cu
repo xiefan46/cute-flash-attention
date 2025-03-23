@@ -91,6 +91,13 @@ __global__ void flash_forward(void* output, const void* q, const void* k,
                        make_shape(q_len, Int<kHeadDim>{}),
                        make_stride(Int<kHeadDim>{}, Int<1>{}));
 
+  if (thread0()) {
+    PRINT("Q", Q);
+    PRINT("K", K);
+    PRINT("V", V);
+    PRINT("O", O);
+  }
+
   auto gQ = local_tile(Q, make_tile(Int<kBlockM>{}, Int<kHeadDim>{}),
                        make_coord(m_block, _));
   auto gK = local_tile(K, make_tile(Int<kBlockN>{}, Int<kHeadDim>{}),
@@ -149,7 +156,7 @@ __global__ void flash_forward(void* output, const void* q, const void* k,
   auto tQsQ_int4 = recast<int4>(tQsQ);
 
   if (thread0()) {
-    PRINT("tQsQ_int4 shape:", tQsQ_int4.shape());
+    PRINT("tQsQ_int4", tQsQ_int4);
   }
 
 #pragma unroll
