@@ -224,7 +224,7 @@ __global__ void flash_forward(void* output, const void* q, const void* k,
   auto rAccOut =
       partition_fragment_C(tiled_mma, Shape<Int<kBlockM>, Int<kHeadDim>>{});
 
-  if (thread0())
+  if (thread0()) {
     PRINT("rAccOut", rAccOut);
   }
 
@@ -234,6 +234,10 @@ __global__ void flash_forward(void* output, const void* q, const void* k,
 //  if (thread0()) {
 //    PRINT("size<1>(rAccOut)", size<1>(rAccOut));
 //  }
+  if (thread0()) {
+    PRINT("size<1>(rAccOut)", size<1>(rAccOut));
+    PRINT("scores_max", scores_max);
+  }
 
   auto scores_sum = make_fragment_like(scores_max);
   auto rAccScore = partition_fragment_C(
