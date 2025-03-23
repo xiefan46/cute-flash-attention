@@ -61,12 +61,14 @@ __global__ void flash_forward(void* output, const void* q, const void* k,
       PRINT("kHeadDim", kHeadDim);
       PRINT("head_stride", head_stride);
       PRINT("bs_head_offset", bs_head_offset);
-      PRINT("SmemLayoutQ", SmemLayoutQ{}.shape());
-      PRINT("SmemLayoutK", SmemLayoutK{}.shape());
-      PRINT("SmemLayoutV", SmemLayoutV{}.shape());
-      PRINT("SmemLayoutO", SmemLayoutO{}.shape());
-
-      PRINT_LAYOUT("SmemLayoutQ", SmemLayoutQ{})
+//      PRINT("SmemLayoutQ", SmemLayoutQ{}.shape());
+//      PRINT("SmemLayoutK", SmemLayoutK{}.shape());
+//      PRINT("SmemLayoutV", SmemLayoutV{}.shape());
+//      PRINT("SmemLayoutO", SmemLayoutO{}.shape());
+      PRINT("SmemLayoutQ", SmemLayoutQ{});
+      PRINT("SmemLayoutK", SmemLayoutK{});
+      PRINT("SmemLayoutV", SmemLayoutV{});
+      PRINT("SmemLayoutO", SmemLayoutO{});
   }
 
 
