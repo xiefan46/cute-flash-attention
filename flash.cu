@@ -232,7 +232,7 @@ __global__ void flash_forward(void* output, const void* q, const void* k,
       make_tensor<float>(Shape<Int<2 * size<1>(rAccOut)>>{});  // (2*MMA_M)
 
   if (thread0()) {
-    PRINT("size<1>(rAccOut)", size<1>(rAccOut)
+    PRINT("size<1>(rAccOut)", size<1>(rAccOut));
   }
 
   auto scores_sum = make_fragment_like(scores_max);
