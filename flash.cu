@@ -84,9 +84,6 @@ __global__ void flash_forward(void* output, const void* q, const void* k,
   auto tVgV = gmem_thr_copy_QKV.partition_S(gV(_, _, 0));
   auto tVsV = gmem_thr_copy_QKV.partition_D(sV);
 
-  PRINT("tQgQ layout:", tQgQ.layout());
-
-
   TiledMMA tiled_mma;
   auto thr_mma = tiled_mma.get_slice(tidx);
   auto tSrQ = thr_mma.partition_fragment_A(sQ);             // (MMA,MMA_M,MMA_K)
@@ -120,7 +117,7 @@ __global__ void flash_forward(void* output, const void* q, const void* k,
   auto tQsQ_int4 = recast<int4>(tQsQ);
 
   if (thread0()) {
-    PRINT(tQsQ_int4.shape());
+    PRINT("tQsQ_int4 shape:", tQsQ_int4.shape());
   }
 
 #pragma unroll
