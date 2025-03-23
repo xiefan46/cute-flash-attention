@@ -69,6 +69,8 @@ __global__ void flash_forward(void* output, const void* q, const void* k,
       PRINT("SmemLayoutK", SmemLayoutK{});
       PRINT("SmemLayoutV", SmemLayoutV{});
       PRINT("SmemLayoutO", SmemLayoutO{});
+      PRINT("SmemLayoutVt", SmemLayoutVt{});
+      PRINT("SmemLayoutVtNoSwizzle", SmemLayoutVtNoSwizzle{});
   }
 
 
