@@ -257,6 +257,12 @@ __global__ void flash_forward(void* output, const void* q, const void* k,
                   make_layout(get<0>(get<0>(ol)), get<2>(ol)));
   auto rAccOut_new = make_tensor(rAccOut.data(), rAccOut_new_layout);
 
+  if (thread0()) {
+    PRINT("ol", ol);
+    PRINT("rAccOut_new_layout", rAccOut_new_layout);
+    PRINT("rAccOut_new", rAccOut_new);
+  }
+
   const int n_block_min = 0;
   int n_block_max = cute::ceil_div(k_len, kBlockN);
 #pragma unroll 1
