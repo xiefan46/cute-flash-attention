@@ -485,7 +485,7 @@ struct FlashConfig {
 
 }  // namespace config
 
-torch::Tensor forward(torch::Tensor q, torch::Tensor k, torch::Tensor v) {
+torch::Tensor forward_no_softmax(torch::Tensor q, torch::Tensor k, torch::Tensor v) {
   int bs = q.size(0);
   int head_num = q.size(1);
   int q_len = q.size(2);
