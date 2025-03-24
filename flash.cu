@@ -5,21 +5,6 @@
 
 #include <cute/tensor.hpp>
 
-using namespace cute;
-
-#define PRINT(name, content) \
-print(name);             \
-print(" : ");            \
-print(content);          \
-print("\n");
-
-
-#define PRINT_LAYOUT(name, content) \
-  print(name); \
-  print(" : "); \
-  print_layout(content); \
-  print("\n");
-
 template <typename config>
 __global__ void flash_forward(void* output, const void* q, const void* k,
                               const void* v, int head_stride, int q_len,
@@ -55,29 +40,6 @@ __global__ void flash_forward(void* output, const void* q, const void* k,
 
   const int bs_head_offset = base_id * head_stride;
 
-  if (thread0()) {
-      PRINT("kBlockM", kBlockM);
-      PRINT("kBlockN", kBlockN);
-      PRINT("kHeadDim", kHeadDim);
-      PRINT("head_stride", head_stride);
-      PRINT("bs_head_offset", bs_head_offset);
-//      PRINT("SmemLayoutQ", SmemLayoutQ{}.shape());
-//      PRINT("SmemLayoutK", SmemLayoutK{}.shape());
-//      PRINT("SmemLayoutV", SmemLayoutV{}.shape());
-//      PRINT("SmemLayoutO", SmemLayoutO{}.shape());
-      PRINT("SmemLayoutQ", SmemLayoutQ{});
-      PRINT("SmemLayoutK", SmemLayoutK{});
-      PRINT("SmemLayoutV", SmemLayoutV{});
-      PRINT("SmemLayoutO", SmemLayoutO{});
-      PRINT("SmemLayoutVt", SmemLayoutVt{});
-      PRINT("SmemLayoutVtNoSwizzle", SmemLayoutVtNoSwizzle{});
-      PRINT("size(SmemLayoutQ{})", size(SmemLayoutQ{}));
-      PRINT("size(SmemLayoutK{})", size(SmemLayoutK{}));
-      PRINT("cosize(SmemLayoutQ{})", cosize(SmemLayoutQ{}));
-      PRINT("cosize(SmemLayoutK{})", cosize(SmemLayoutK{}));
-  }
-
-
   auto Q = make_tensor(make_gmem_ptr<half_t>((T*)q + bs_head_offset),
                        make_shape(q_len, Int<kHeadDim>{}),
                        make_stride(Int<kHeadDim>{}, Int<1>{}));
@@ -91,25 +53,12 @@ __global__ void flash_forward(void* output, const void* q, const void* k,
                        make_shape(q_len, Int<kHeadDim>{}),
                        make_stride(Int<kHeadDim>{}, Int<1>{}));
 
-  if (thread0()) {
-    PRINT("Q", Q);
-    PRINT("K", K);
-    PRINT("V", V);
-    PRINT("O", O);
-  }
-
   auto gQ = local_tile(Q, make_tile(Int<kBlockM>{}, Int<kHeadDim>{}),
                        make_coord(m_block, _));
   auto gK = local_tile(K, make_tile(Int<kBlockN>{}, Int<kHeadDim>{}),
                        make_coord(0, _));
   auto gV = local_tile(V, make_tile(Int<kBlockN>{}, Int<kHeadDim>{}),
                        make_coord(0, _));
-
-  if (thread0()) {
-    PRINT("gQ", gQ);
-    PRINT("gK", gK);
-    PRINT("gV", gV);
-  }
 
   auto sQ = make_tensor(make_smem_ptr<half_t>(q_shm), SmemLayoutQ{});
   auto sK = make_tensor(make_smem_ptr<half_t>(k_shm), SmemLayoutK{});
@@ -120,14 +69,6 @@ __global__ void flash_forward(void* output, const void* q, const void* k,
   auto sVtNoSwizzle =
       make_tensor(make_smem_ptr<half_t>(v_shm), SmemLayoutVtNoSwizzle{});
 
-  if (thread0()) {
-    PRINT("sQ", sQ);
-    PRINT("sK", sK);
-    PRINT("sV", sV);
-    PRINT("sVt", sVt);
-    PRINT("sVtNoSwizzle", sVtNoSwizzle);
-  }
-
   GmemTiledCopyQKV gmem_tiled_copy_QKV;
   auto gmem_thr_copy_QKV = gmem_tiled_copy_QKV.get_thread_slice(tidx);
   auto tQgQ = gmem_thr_copy_QKV.partition_S(gQ(_, _, 0));
@@ -137,39 +78,11 @@ __global__ void flash_forward(void* output, const void* q, const void* k,
   auto tVgV = gmem_thr_copy_QKV.partition_S(gV(_, _, 0));
   auto tVsV = gmem_thr_copy_QKV.partition_D(sV);
 
-
-  // size_per_thread = block_size / thread_num = 64 * 64 / 128 = 32
-  if (thread0()) {
-    PRINT("tQgQ", tQgQ);
-    PRINT("size tQgQ", size(tQgQ));
-    PRINT("tQsQ", tQsQ);
-    PRINT("size tQsQ", size(tQsQ));
-    PRINT("tKgK", tKgK);
-    PRINT("size tKgK", size(tKgK));
-    PRINT("tKsK", tKsK);
-    PRINT("size tKsK", size(tKsK));
-    PRINT("tVgV", tVgV);
-    PRINT("size tVgV", size(tVgV));
-    PRINT("tVsV", tVsV);
-    PRINT("size tVsV", size(tVsV));
-  }
-
-
   TiledMMA tiled_mma;
   auto thr_mma = tiled_mma.get_slice(tidx);
   auto tSrQ = thr_mma.partition_fragment_A(sQ);             // (MMA,MMA_M,MMA_K)
   auto tSrK = thr_mma.partition_fragment_B(sK);             // (MMA,MMA_N,MMA_K)
   auto tOrVt = thr_mma.partition_fragment_B(sVtNoSwizzle);  // (MMA,MMA_K,MMA_N)
-
-  if (thread0()) {
-    PRINT("tSrQ", tSrQ);
-    PRINT("size tSrQ", size(tSrQ));
-    PRINT("tSrK", tSrK);
-    PRINT("size tSrK", size(tSrK));
-    PRINT("tOrVt", tOrVt);
-    PRINT("size tOrVt", size(tOrVt));
-  }
-
 
   auto smem_tiled_copy_Q = make_tiled_copy_A(SmemCopyAtom{}, tiled_mma);
   auto smem_thr_copy_Q = smem_tiled_copy_Q.get_thread_slice(tidx);
@@ -196,11 +109,6 @@ __global__ void flash_forward(void* output, const void* q, const void* k,
   // multiply sm scale
   half2 sm_half2 = {__float2half_rn(sm_scale), __float2half_rn(sm_scale)};
   auto tQsQ_int4 = recast<int4>(tQsQ);
-
-  if (thread0()) {
-    PRINT("tQsQ_int4", tQsQ_int4);
-  }
-
 #pragma unroll
   for (int ii = 0; ii < size(tQsQ_int4); ii++) {
     auto tmp = tQsQ_int4(ii);
@@ -223,22 +131,8 @@ __global__ void flash_forward(void* output, const void* q, const void* k,
   // ((2,2),MMA_M,MMA_K)
   auto rAccOut =
       partition_fragment_C(tiled_mma, Shape<Int<kBlockM>, Int<kHeadDim>>{});
-
-  if (thread0()) {
-    PRINT("rAccOut", rAccOut);
-  }
-
   auto scores_max =
       make_tensor<float>(Shape<Int<2 * size<1>(rAccOut)>>{});  // (2*MMA_M)
-
-//  if (thread0()) {
-//    PRINT("size<1>(rAccOut)", size<1>(rAccOut));
-//  }
-  if (thread0()) {
-    PRINT("size<1>(rAccOut)", size<1>(rAccOut));
-    PRINT("scores_max", scores_max);
-  }
-
   auto scores_sum = make_fragment_like(scores_max);
   auto rAccScore = partition_fragment_C(
       tiled_mma, make_shape(Int<kBlockM>{}, Int<kBlockN>{}));
@@ -256,12 +150,6 @@ __global__ void flash_forward(void* output, const void* q, const void* k,
       make_layout(make_layout(get<1>(get<0>(ol)), get<1>(ol)),
                   make_layout(get<0>(get<0>(ol)), get<2>(ol)));
   auto rAccOut_new = make_tensor(rAccOut.data(), rAccOut_new_layout);
-
-  if (thread0()) {
-    PRINT("ol", ol);
-    PRINT("rAccOut_new_layout", rAccOut_new_layout);
-    PRINT("rAccOut_new", rAccOut_new);
-  }
 
   const int n_block_min = 0;
   int n_block_max = cute::ceil_div(k_len, kBlockN);
@@ -295,19 +183,8 @@ __global__ void flash_forward(void* output, const void* q, const void* k,
                     make_layout(get<0>(get<0>(sl)), get<2>(sl)));
     auto scores = make_tensor(rAccScore.data(), rAccScore_new_layout);
 
-
-
-
     // softmax
     auto scores_max_pre = make_fragment_like(scores_max);
-
-    if (thread0()) {
-      PRINT("sl", sl);
-      PRINT("rAccScore_new_layout", rAccScore_new_layout);
-      PRINT("scores", scores);
-      PRINT("scores_max_pre", scores_max_pre);
-    }
-
     cute::copy(scores_max, scores_max_pre);
 #pragma unroll
     for (int si = 0; si < size<0>(scores); si++) {
@@ -402,6 +279,99 @@ __global__ void flash_forward(void* output, const void* q, const void* k,
       rAccOut_new(oi, oj) *= scores_sum(oi);
     }
   }
+
+  if (thread0()) {
+    PRINT("kBlockM", kBlockM);
+    PRINT("kBlockN", kBlockN);
+    PRINT("kHeadDim", kHeadDim);
+    PRINT("head_stride", head_stride);
+    PRINT("bs_head_offset", bs_head_offset);
+    PRINT("SmemLayoutQ", SmemLayoutQ{});
+    PRINT("SmemLayoutK", SmemLayoutK{});
+    PRINT("SmemLayoutV", SmemLayoutV{});
+    PRINT("SmemLayoutO", SmemLayoutO{});
+    PRINT("SmemLayoutVt", SmemLayoutVt{});
+    PRINT("SmemLayoutVtNoSwizzle", SmemLayoutVtNoSwizzle{});
+    PRINT("size(SmemLayoutQ{})", size(SmemLayoutQ{}));
+    PRINT("size(SmemLayoutK{})", size(SmemLayoutK{}));
+    PRINT("cosize(SmemLayoutQ{})", cosize(SmemLayoutQ{}));
+    PRINT("cosize(SmemLayoutK{})", cosize(SmemLayoutK{}));
+}
+
+if (thread0()) {
+  PRINT("Q", Q);
+  PRINT("K", K);
+  PRINT("V", V);
+  PRINT("O", O);
+}
+
+if (thread0()) {
+  PRINT("gQ", gQ);
+  PRINT("gK", gK);
+  PRINT("gV", gV);
+}
+
+if (thread0()) {
+  PRINT("sQ", sQ);
+  PRINT("sK", sK);
+  PRINT("sV", sV);
+  PRINT("sVt", sVt);
+  PRINT("sVtNoSwizzle", sVtNoSwizzle);
+}
+
+
+// size_per_thread = block_size / thread_num = 64 * 64 / 128 = 32
+if (thread0()) {
+  PRINT("tQgQ", tQgQ);
+  PRINT("size tQgQ", size(tQgQ));
+  PRINT("tQsQ", tQsQ);
+  PRINT("size tQsQ", size(tQsQ));
+  PRINT("tKgK", tKgK);
+  PRINT("size tKgK", size(tKgK));
+  PRINT("tKsK", tKsK);
+  PRINT("size tKsK", size(tKsK));
+  PRINT("tVgV", tVgV);
+  PRINT("size tVgV", size(tVgV));
+  PRINT("tVsV", tVsV);
+  PRINT("size tVsV", size(tVsV));
+}
+
+
+if (thread0()) {
+  PRINT("tSrQ", tSrQ);
+  PRINT("size tSrQ", size(tSrQ));
+  PRINT("tSrK", tSrK);
+  PRINT("size tSrK", size(tSrK));
+  PRINT("tOrVt", tOrVt);
+  PRINT("size tOrVt", size(tOrVt));
+}
+
+
+if (thread0()) {
+  PRINT("tQsQ_int4", tQsQ_int4);
+}
+
+if (thread0()) {
+  PRINT("rAccOut", rAccOut);
+}
+
+if (thread0()) {
+  PRINT("size<1>(rAccOut)", size<1>(rAccOut));
+  PRINT("scores_max", scores_max);
+}
+
+if (thread0()) {
+  PRINT("ol", ol);
+  PRINT("rAccOut_new_layout", rAccOut_new_layout);
+  PRINT("rAccOut_new", rAccOut_new);
+}
+
+if (thread0()) {
+  PRINT("sl", sl);
+  PRINT("rAccScore_new_layout", rAccScore_new_layout);
+  PRINT("scores", scores);
+  PRINT("scores_max_pre", scores_max_pre);
+}
 
   // write back
   auto rAccOut_fp16 = make_tensor_like<half_t>(rAccOut);
@@ -514,6 +484,7 @@ struct FlashConfig {
 };
 
 }  // namespace config
+
 
 torch::Tensor forward(torch::Tensor q, torch::Tensor k, torch::Tensor v) {
   int bs = q.size(0);
