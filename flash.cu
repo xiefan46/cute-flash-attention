@@ -289,8 +289,19 @@ __global__ void flash_forward(void* output, const void* q, const void* k,
                     make_layout(get<0>(get<0>(sl)), get<2>(sl)));
     auto scores = make_tensor(rAccScore.data(), rAccScore_new_layout);
 
+
+
+
     // softmax
     auto scores_max_pre = make_fragment_like(scores_max);
+
+    if (thread0()) {
+      PRINT("sl", sl);
+      PRINT("rAccScore_new_layout", rAccScore_new_layout);
+      PRINT("scores", scores);
+      PRINT("scores_max_pre", scores_max_pre);
+    }
+
     cute::copy(scores_max, scores_max_pre);
 #pragma unroll
     for (int si = 0; si < size<0>(scores); si++) {
