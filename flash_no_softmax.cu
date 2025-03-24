@@ -233,7 +233,7 @@ __global__ void flash_forward(void* output, const void* q, const void* k,
   auto rAccScore = partition_fragment_C(
       tiled_mma, make_shape(Int<kBlockM>{}, Int<kBlockN>{}));
   clear(rAccOut);
-  // init scores_max, scores_sum
+  // init scores_sum
 #pragma unroll
   for (int ii = 0; ii < size(scores_sum); ii++) {
     scores_sum(ii) = 0;
@@ -281,17 +281,15 @@ __global__ void flash_forward(void* output, const void* q, const void* k,
 
 
 
-    // softmax
-    auto scores_max_pre = make_fragment_like(scores_max);
+
 
     if (thread0()) {
       PRINT("sl", sl);
       PRINT("rAccScore_new_layout", rAccScore_new_layout);
       PRINT("scores", scores);
-      PRINT("scores_max_pre", scores_max_pre);
+
     }
 
-    cute::copy(scores_max, scores_max_pre);
 #pragma unroll
     for (int si = 0; si < size<0>(scores); si++) {
       float& scores_sum_si = scores_sum(si);
