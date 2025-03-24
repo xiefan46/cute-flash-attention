@@ -260,11 +260,11 @@ __global__ void flash_forward(void* output, const void* q, const void* k,
                     make_layout(get<0>(get<0>(sl)), get<2>(sl)));
     auto scores = make_tensor(rAccScore.data(), rAccScore_new_layout);
 
-    if (thread0()) {
-      PRINT("sl", sl);
-      PRINT("rAccScore_new_layout", rAccScore_new_layout)
-      PRINT("scores", scores)
-    }
+//    if (thread0()) {
+//      PRINT("sl", sl);
+//      PRINT("rAccScore_new_layout", rAccScore_new_layout)
+//      PRINT("scores", scores)
+//    }
 
     // softmax
     auto scores_max_pre = make_fragment_like(scores_max);
@@ -329,11 +329,11 @@ __global__ void flash_forward(void* output, const void* q, const void* k,
                     get<1>(get<0>(l)), get<1>(get<1>(get<1>(l))));
     auto tOrS = make_tensor(scores_fp16.data(), scores_new_layout);
 
-    if (thread0()) {
-      PRINT("l", l);
-      PRINT("scores_new_layout", scores_new_layout);
-      PRINT("tOrS", tOrS);
-    }
+//    if (thread0()) {
+//      PRINT("l", l);
+//      PRINT("scores_new_layout", scores_new_layout);
+//      PRINT("tOrS", tOrS);
+//    }
 
     cute::copy(smem_tiled_copy_V, tOsVt(_, _, Int<0>{}),
                tOrVt_view(_, _, Int<0>{}));
