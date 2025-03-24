@@ -5,6 +5,14 @@
 
 #include <cute/tensor.hpp>
 
+using namespace cute;
+
+#define PRINT(name, content) \
+    print(name);             \
+    print(" : ");            \
+    print(content);          \
+    print("\n");
+
 template <typename config>
 __global__ void flash_forward(void* output, const void* q, const void* k,
                               const void* v, int head_stride, int q_len,
