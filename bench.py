@@ -29,8 +29,8 @@ torch.manual_seed(0)
 myflash = load(name='myflash', 
                     sources=[
                         'main.cpp', 
-                        # 'flash.cu',
-                        'flash_no_softmax.cu'
+                        'flash.cu',
+                        # 'flash_no_softmax.cu'
                     ], 
                     extra_cuda_cflags=[
                         '-O2', 
@@ -92,8 +92,8 @@ q2 = q.reshape(batch_size * q_len, n_head, head_embd)
 k2 = k.reshape(batch_size * kv_len, n_head, head_embd)
 v2 = v.reshape(batch_size * kv_len, n_head, head_embd)
 
-a = manual_attn(q1, k1, v1, use_softmax=False)
-b = myflash.forward_no_softmax(q1, k1, v1)
+a = manual_attn(q1, k1, v1)
+b = myflash.forward(q1, k1, v1)
 # c = single_prefill_with_kv_cache(q2, k2, v2)
 # d = flash_attn_func(q, k, v)
 
