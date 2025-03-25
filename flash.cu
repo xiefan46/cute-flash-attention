@@ -250,16 +250,17 @@ __global__ void flash_forward(void* output, const void* q, const void* k,
     auto test_rAccScore_new_layout =
         make_layout(make_layout(get<1>(get<0>(test_sl)), get<1>(test_sl)),
                     make_layout(get<0>(get<0>(test_sl)), get<2>(test_sl)));
-
+    auto test_scores = make_tensor(rAccScore.data(), rAccScore_new_layout);
     if (thread0()) {
         PRINT("test_sl", test_sl);
-        PRINT("test_rAccScore_new_layout",test_rAccScore_new_layout )
+        PRINT("test_rAccScore_new_layout",test_rAccScore_new_layout);
+        PRINT("test_scores",test_scores )
     }
 
 
   const int n_block_min = 0;
   int n_block_max = cute::ceil_div(k_len, kBlockN);
-// #pragma unroll 1
+  #pragma unroll 1
   for (int ii = n_block_min; ii < n_block_max; ii++) {
     clear(rAccScore);
     // wait k
@@ -288,10 +289,6 @@ __global__ void flash_forward(void* output, const void* q, const void* k,
         make_layout(make_layout(get<1>(get<0>(sl)), get<1>(sl)),
                     make_layout(get<0>(get<0>(sl)), get<2>(sl)));
 
-    if (thread0()) {
-        PRINT("sl", sl);
-        PRINT("rAccScore_new_layout",rAccScore_new_layout )
-    }
 
 
 
