@@ -206,13 +206,24 @@ __global__ void flash_forward(void* output, const void* q, const void* k,
   // copy kv
 
   // ((2,2),MMA_M,MMA_K)
+  // rAccOut存的是最终想要的 Br x d 的矩阵
   auto rAccOut =
       partition_fragment_C(tiled_mma, Shape<Int<kBlockM>, Int<kHeadDim>>{});
   auto scores_max =
       make_tensor<float>(Shape<Int<2 * size<1>(rAccOut)>>{});  // (2*MMA_M)
   auto scores_sum = make_fragment_like(scores_max);
+
+  // rAccScore存的是 中间attention score的 S矩阵
   auto rAccScore = partition_fragment_C(
       tiled_mma, make_shape(Int<kBlockM>{}, Int<kBlockN>{}));
+
+  if (thread0()) {
+    PRINT("rAccOut", rAccOut);
+    PRINT("rAccScore", rAccScore);
+    PRINT("scores_max", scores_max);
+    PRINT("scores_sum", scores_sum);
+  }
+
   clear(rAccOut);
   // init scores_max, scores_sum
 #pragma unroll
@@ -258,6 +269,8 @@ __global__ void flash_forward(void* output, const void* q, const void* k,
     auto rAccScore_new_layout =
         make_layout(make_layout(get<1>(get<0>(sl)), get<1>(sl)),
                     make_layout(get<0>(get<0>(sl)), get<2>(sl)));
+
+    // 所有线程的scores加起来应该就是小的S矩阵，size: [Br, Bc]. 注意这里是一个thread block共同持有这个S矩阵
     auto scores = make_tensor(rAccScore.data(), rAccScore_new_layout);
 
     if (ii == 0 && thread0()) {
