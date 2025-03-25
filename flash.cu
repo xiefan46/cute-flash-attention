@@ -254,7 +254,7 @@ __global__ void flash_forward(void* output, const void* q, const void* k,
     if (thread0()) {
         PRINT("test_sl", test_sl);
         PRINT("test_rAccScore_new_layout",test_rAccScore_new_layout);
-        PRINT("test_scores",test_scores )
+        PRINT("test_scores",test_scores );
     }
 
 
