@@ -217,12 +217,12 @@ __global__ void flash_forward(void* output, const void* q, const void* k,
   auto rAccScore = partition_fragment_C(
       tiled_mma, make_shape(Int<kBlockM>{}, Int<kBlockN>{}));
 
-//  if (thread0()) {
-//    PRINT("rAccOut", rAccOut);
-//    PRINT("rAccScore", rAccScore);
-//    PRINT("scores_max", scores_max);
-//    PRINT("scores_sum", scores_sum);
-//  }
+  if (thread0()) {
+    PRINT("rAccOut", rAccOut);
+    PRINT("rAccScore", rAccScore);
+    PRINT("scores_max", scores_max);
+    PRINT("scores_sum", scores_sum);
+  }
 
   clear(rAccOut);
   // init scores_max, scores_sum
@@ -238,6 +238,14 @@ __global__ void flash_forward(void* output, const void* q, const void* k,
       make_layout(make_layout(get<1>(get<0>(ol)), get<1>(ol)),
                   make_layout(get<0>(get<0>(ol)), get<2>(ol)));
   auto rAccOut_new = make_tensor(rAccOut.data(), rAccOut_new_layout);
+
+
+  if (thread0()) {
+    PRINT("ol", ol);
+    PRINT("rAccOut_new_layout", rAccOut_new_layout);
+    PRINT("rAccOut_new", rAccOut_new);
+  }
+
 
   const int n_block_min = 0;
   int n_block_max = cute::ceil_div(k_len, kBlockN);
@@ -273,9 +281,9 @@ __global__ void flash_forward(void* output, const void* q, const void* k,
     // 所有线程的scores加起来应该就是小的S矩阵，size: [Br, Bc]. 注意这里是一个thread block共同持有这个S矩阵
     auto scores = make_tensor(rAccScore.data(), rAccScore_new_layout);
 
-    if (ii == 0 && thread0()) {
-      PRINT("sl", sl);
-    }
+//    if (ii == 0 && thread0()) {
+//      PRINT("sl", sl);
+//    }
 
     // softmax
     auto scores_max_pre = make_fragment_like(scores_max);
