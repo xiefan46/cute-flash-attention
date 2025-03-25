@@ -217,12 +217,12 @@ __global__ void flash_forward(void* output, const void* q, const void* k,
   auto rAccScore = partition_fragment_C(
       tiled_mma, make_shape(Int<kBlockM>{}, Int<kBlockN>{}));
 
-  if (thread0()) {
-    PRINT("rAccOut", rAccOut);
-    PRINT("rAccScore", rAccScore);
-    PRINT("scores_max", scores_max);
-    PRINT("scores_sum", scores_sum);
-  }
+//  if (thread0()) {
+//    PRINT("rAccOut", rAccOut);
+//    PRINT("rAccScore", rAccScore);
+//    PRINT("scores_max", scores_max);
+//    PRINT("scores_sum", scores_sum);
+//  }
 
   clear(rAccOut);
   // init scores_max, scores_sum
