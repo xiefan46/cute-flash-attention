@@ -250,7 +250,7 @@ __global__ void flash_forward(void* output, const void* q, const void* k,
     auto test_rAccScore_new_layout =
         make_layout(make_layout(get<1>(get<0>(test_sl)), get<1>(test_sl)),
                     make_layout(get<0>(get<0>(test_sl)), get<2>(test_sl)));
-    auto test_scores = make_tensor(rAccScore.data(), rAccScore_new_layout);
+    auto test_scores = make_tensor(rAccScore.data(), test_rAccScore_new_layout);
     if (thread0()) {
         PRINT("test_sl", test_sl);
         PRINT("test_rAccScore_new_layout",test_rAccScore_new_layout);
