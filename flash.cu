@@ -246,10 +246,20 @@ __global__ void flash_forward(void* output, const void* q, const void* k,
     PRINT("rAccOut_new", rAccOut_new);
   }
 
+    auto test_sl = logical_divide(rAccScore.layout(), Shape<Int<2>>{});
+    auto test_rAccScore_new_layout =
+        make_layout(make_layout(get<1>(get<0>(sl)), get<1>(sl)),
+                    make_layout(get<0>(get<0>(sl)), get<2>(sl)));
+
+    if (thread0()) {
+        PRINT("test_sl", test_sl);
+        PRINT("test_rAccScore_new_layout",test_rAccScore_new_layout )
+    }
+
 
   const int n_block_min = 0;
   int n_block_max = cute::ceil_div(k_len, kBlockN);
-#pragma unroll 1
+// #pragma unroll 1
   for (int ii = n_block_min; ii < n_block_max; ii++) {
     clear(rAccScore);
     // wait k
