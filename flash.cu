@@ -278,6 +278,10 @@ __global__ void flash_forward(void* output, const void* q, const void* k,
         make_layout(make_layout(get<1>(get<0>(sl)), get<1>(sl)),
                     make_layout(get<0>(get<0>(sl)), get<2>(sl)));
 
+
+    PRINT("sl", sl);
+    PRINT("rAccScore_new_layout",rAccScore_new_layout )
+
     // 所有线程的scores加起来应该就是小的S矩阵，size: [Br, Bc]. 注意这里是一个thread block共同持有这个S矩阵
     auto scores = make_tensor(rAccScore.data(), rAccScore_new_layout);
 
