@@ -248,8 +248,8 @@ __global__ void flash_forward(void* output, const void* q, const void* k,
 
     auto test_sl = logical_divide(rAccScore.layout(), Shape<Int<2>>{});
     auto test_rAccScore_new_layout =
-        make_layout(make_layout(get<1>(get<0>(sl)), get<1>(sl)),
-                    make_layout(get<0>(get<0>(sl)), get<2>(sl)));
+        make_layout(make_layout(get<1>(get<0>(test_sl)), get<1>(test_sl)),
+                    make_layout(get<0>(get<0>(test_sl)), get<2>(test_sl)));
 
     if (thread0()) {
         PRINT("test_sl", test_sl);
