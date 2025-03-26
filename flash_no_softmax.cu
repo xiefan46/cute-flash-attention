@@ -459,7 +459,7 @@ torch::Tensor forward_no_softmax(torch::Tensor q, torch::Tensor k, torch::Tensor
 
   auto out = torch::empty_like(q);
 
-  float sm_scale = 1.0 / sqrt(head_dim) * M_LOG2E;
+  float sm_scale = 1.0 / sqrt(head_dim);
 
   // only for head_dim=64
   config::FlashConfig<cute::half_t> config;
