@@ -170,6 +170,14 @@ __global__ void flash_forward(void* output, const void* q, const void* k,
   PRINT("O", O);
 }
 
+  auto all_gQ = local_tile(Q, make_tile(Int<kBlockM>{}, Int<kHeadDim>{}),
+                          make_coord(_, _));
+
+  if (thread0()) {
+
+      PRINT("all_gQ", all_gQ);
+  }
+
   auto gQ = local_tile(Q, make_tile(Int<kBlockM>{}, Int<kHeadDim>{}),
                        make_coord(m_block, _));
   auto gK = local_tile(K, make_tile(Int<kBlockN>{}, Int<kHeadDim>{}),
