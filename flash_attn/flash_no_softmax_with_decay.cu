@@ -98,7 +98,7 @@ struct FlashConfig {
 
 template <typename config>
 __global__ void flash_forward(const void* Q, const void* K, const void* V, void* O, const void* slopes,
-                              const int B, const int H, const int N, const int d) {
+                              const int B, const int H, const int N) {
   using namespace cute;
   using X = Underscore;
   using T = typename config::T;
@@ -145,14 +145,14 @@ __global__ void flash_forward(const void* Q, const void* K, const void* V, void*
   const int head_id = bx % H;
   const int tx = threadIdx.x;
   const int slope = slopes[head_id];
-  const int bs_head_offset = bx * N * d;
+  const int bs_head_offset = bx * N * kHeadDim;
 
 
 
-  auto Q = make_tensor(make_gmem_ptr<half_t>((T*)q + bs_head_offset), make_shape(N, d), make_stride(d, _1));
-  auto K = make_tensor(make_gmem_ptr<half_t>((T*)k + bs_head_offset), make_shape(N, d), make_stride(d, _1));
-  auto V = make_tensor(make_gmem_ptr<half_t>((T*)v + bs_head_offset), make_shape(N, d), make_stride(d, _1));
-  auto O = make_tensor(make_gmem_ptr<half_t>((T*)output + bs_head_offset), make_shape(N, d), make_stride(d, _1));
+  auto Q = make_tensor(make_gmem_ptr<half_t>((T*)q + bs_head_offset), make_shape(N, Int<kHeadDim>>{}), make_stride(Int<kHeadDim>>{}, _1));
+  auto K = make_tensor(make_gmem_ptr<half_t>((T*)k + bs_head_offset), make_shape(N, Int<kHeadDim>>{}), make_stride(Int<kHeadDim>>{}, _1));
+  auto V = make_tensor(make_gmem_ptr<half_t>((T*)v + bs_head_offset), make_shape(N, Int<kHeadDim>>{}), make_stride(Int<kHeadDim>>{}, _1));
+  auto O = make_tensor(make_gmem_ptr<half_t>((T*)output + bs_head_offset), make_shape(N, Int<kHeadDim>>{}), make_stride(Int<kHeadDim>>{}, _1));
 
   if (thread0()) {
       PRINT("Q", Q);

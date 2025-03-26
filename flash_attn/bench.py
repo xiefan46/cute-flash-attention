@@ -104,15 +104,15 @@ def test_no_softmax(q, k, v):
     print('attn values sanity check:', torch.allclose(a, b, rtol=1e-03, atol=1e-03))
 
 set_seed(10086)
-batch_size = 2
-n_head = 16
-q_len = 64
-kv_len = q_len
-head_embd = 64 
+B = 2
+H = 16
+N = 128
+# NOTE: we only support d = 64!
+d = 64
 
-q = torch.randn(batch_size, q_len, n_head, head_embd).cuda().half()
-k = torch.randn(batch_size, kv_len, n_head, head_embd).cuda().half()
-v = torch.randn(batch_size, kv_len, n_head, head_embd).cuda().half()
+q = torch.randn(B, H, N, d).cuda().half()
+k = torch.randn(B, H, N, d).cuda().half()
+v = torch.randn(B, H, N, d).cuda().half()
 q1 = q.transpose(1, 2).contiguous()
 k1 = k.transpose(1, 2).contiguous()
 v1 = v.transpose(1, 2).contiguous()
