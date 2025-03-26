@@ -469,7 +469,7 @@ torch::Tensor forward_no_softmax(torch::Tensor q, torch::Tensor k, torch::Tensor
   config::FlashConfig<cute::half_t> config;
 
   int bx = (q_len + config.kBlockM - 1) / config.kBlockM;
-  std::cout<<"q len: "<<q_len<<" bx:"<<bx<std::endl;
+  std::cout<<"q len: "<<q_len<<" bx:"<<bx<<std::endl;
 
   dim3 block = config.kThreadNum;
   dim3 grid((q_len + config.kBlockM - 1) / config.kBlockM, bs * head_num);
