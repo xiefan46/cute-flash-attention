@@ -104,8 +104,8 @@ def test_no_softmax(q, k, v):
     print('attn values sanity check:', torch.allclose(a, b, rtol=1e-03, atol=1e-03))
 
 set_seed(10086)
-batch_size = 1
-n_head = 1
+batch_size = 2
+n_head = 16
 q_len = 64
 kv_len = q_len
 head_embd = 64 
