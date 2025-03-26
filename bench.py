@@ -30,7 +30,8 @@ myflash = load(name='myflash',
                     sources=[
                         'main.cpp', 
                         # 'flash.cu',
-                        'flash_no_softmax.cu'
+                        'flash_no_softmax.cu',
+                        'flash_no_softmax_no_normal.cu'
                     ], 
                     extra_cuda_cflags=[
                         '-O2', 
@@ -44,6 +45,15 @@ myflash = load(name='myflash',
 
 def manual_attn(q, k, v, attn_mask=None, use_softmax = True):
     att = (q @ k.transpose(-2, -1)) * (1.0 / math.sqrt(k.size(-1)))
+    if attn_mask != None:
+        att.masked_fill_(attn_mask, float('-inf'))  # Apply mask
+    if use_softmax:
+        att = F.softmax(att, dim=-1)
+    y = att @ v
+    return y
+
+def manual_attn_no_normal(q, k, v, attn_mask=None, use_softmax = True):
+    att = q @ k.transpose(-2, -1)
     if attn_mask != None:
         att.masked_fill_(attn_mask, float('-inf'))  # Apply mask
     if use_softmax:
@@ -100,6 +110,11 @@ v2 = v.reshape(batch_size * kv_len, n_head, head_embd)
 a = manual_attn(q1, k1, v1, use_softmax=False)
 b = myflash.forward_no_softmax(q1, k1, v1)
 
+c = manual_attn_no_normal(q1, k1, v1, use_softmax=False)
+d = myflash.forward_no_softmax_no_normal(q1, k1, v1)
+
 print(f"a: {a[0,0, :, :]}")
 print(f"b: {b[0,0,:, :]}")
 print('attn values sanity check:', torch.allclose(a, b, rtol=1e-03, atol=1e-03))
+
+print('attn values sanity check c, d:', torch.allclose(c, d, rtol=1e-03, atol=1e-03))
