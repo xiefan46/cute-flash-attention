@@ -30,8 +30,9 @@ myflash = load(name='myflash',
                     sources=[
                         'main.cpp', 
                         # 'flash.cu',
-                        'flash_no_softmax.cu',
-                        'flash_no_softmax_no_normal.cu'
+                        # 'flash_no_softmax.cu',
+                        # 'flash_no_softmax_no_normal.cu'
+                        'compute_qk.cu'
                     ], 
                     extra_cuda_cflags=[
                         '-O2', 
@@ -42,6 +43,9 @@ myflash = load(name='myflash',
                         '-I/root/cutlass/tools/util/include',
                     ], 
                 )
+
+def compute_qk_manual(q, k):
+    return q @ k.transpose(-2, -1)
 
 def manual_attn(q, k, v, attn_mask=None, use_softmax = True):
     att = (q @ k.transpose(-2, -1)) * (1.0 / math.sqrt(k.size(-1)))
@@ -85,6 +89,20 @@ def set_seed(seed=42):
     os.environ['CUBLAS_WORKSPACE_CONFIG'] = ':4096:8'  # 针对某些CUDA操作
 
 
+
+def test_compute_qk(q, k):
+    a = compute_qk_manual(q, k)
+    b = myflash.compute_qk_forward(q, k)
+    print('compute qk check', torch.allclose(a, b, rtol=1e-03, atol=1e-03))
+
+
+def test_no_softmax(q, k, v):
+    a = manual_attn(q1, k1, v1, use_softmax=False)
+    b = myflash.forward_no_softmax(q1, k1, v1)
+    print(f"a: {a[0,0, :, :]}")
+    print(f"b: {b[0,0,:, :]}")
+    print('attn values sanity check:', torch.allclose(a, b, rtol=1e-03, atol=1e-03))
+
 set_seed(10086)
 batch_size = 1
 n_head = 1
@@ -98,23 +116,19 @@ v = torch.randn(batch_size, kv_len, n_head, head_embd).cuda().half()
 q1 = q.transpose(1, 2).contiguous()
 k1 = k.transpose(1, 2).contiguous()
 v1 = v.transpose(1, 2).contiguous()
-q2 = q.reshape(batch_size * q_len, n_head, head_embd)
-k2 = k.reshape(batch_size * kv_len, n_head, head_embd)
-v2 = v.reshape(batch_size * kv_len, n_head, head_embd)
+
+test_no_softmax(q1, k1, v1)
+
+# test_compute_qk(q1, k1)
+
+
+# q2 = q.reshape(batch_size * q_len, n_head, head_embd)
+# k2 = k.reshape(batch_size * kv_len, n_head, head_embd)
+# v2 = v.reshape(batch_size * kv_len, n_head, head_embd)
 
 # a = manual_attn(q1, k1, v1)
 # b = myflash.forward(q1, k1, v1)
 # c = single_prefill_with_kv_cache(q2, k2, v2)
 # d = flash_attn_func(q, k, v)
 
-a = manual_attn(q1, k1, v1, use_softmax=False)
-b = myflash.forward_no_softmax(q1, k1, v1)
-
-c = manual_attn_no_normal(q1, k1, v1, use_softmax=False)
-d = myflash.forward_no_softmax_no_normal(q1, k1, v1)
-
-print(f"a: {a[0,0, :, :]}")
-print(f"b: {b[0,0,:, :]}")
-print('attn values sanity check:', torch.allclose(a, b, rtol=1e-03, atol=1e-03))
-
-print('attn values sanity check c, d:', torch.allclose(c, d, rtol=1e-03, atol=1e-03))
+# print('attn values sanity check c, d:', torch.allclose(c, d, rtol=1e-03, atol=1e-03))
