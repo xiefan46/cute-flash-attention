@@ -8,17 +8,10 @@
 using namespace cute;
 
 #define PRINT(name, content) \
-print(name);             \
-print(" : ");            \
-print(content);          \
-print("\n");
-
-
-#define PRINT_LAYOUT(name, content) \
-  print(name); \
-  print(" : "); \
-  print_layout(content); \
-  print("\n");
+    print(name);             \
+    print(" : ");            \
+    print(content);          \
+    print("\n");
 
 template <typename config>
 __global__ void flash_forward(void* output, const void* q, const void* k,
@@ -55,28 +48,24 @@ __global__ void flash_forward(void* output, const void* q, const void* k,
 
   const int bs_head_offset = base_id * head_stride;
 
-  if (thread0()) {
-      PRINT("kBlockM", kBlockM);
-      PRINT("kBlockN", kBlockN);
-      PRINT("kHeadDim", kHeadDim);
-      PRINT("head_stride", head_stride);
-      PRINT("bs_head_offset", bs_head_offset);
-//      PRINT("SmemLayoutQ", SmemLayoutQ{}.shape());
-//      PRINT("SmemLayoutK", SmemLayoutK{}.shape());
-//      PRINT("SmemLayoutV", SmemLayoutV{}.shape());
-//      PRINT("SmemLayoutO", SmemLayoutO{}.shape());
-      PRINT("SmemLayoutQ", SmemLayoutQ{});
-      PRINT("SmemLayoutK", SmemLayoutK{});
-      PRINT("SmemLayoutV", SmemLayoutV{});
-      PRINT("SmemLayoutO", SmemLayoutO{});
-      PRINT("SmemLayoutVt", SmemLayoutVt{});
-      PRINT("SmemLayoutVtNoSwizzle", SmemLayoutVtNoSwizzle{});
-      PRINT("size(SmemLayoutQ{})", size(SmemLayoutQ{}));
-      PRINT("size(SmemLayoutK{})", size(SmemLayoutK{}));
-      PRINT("cosize(SmemLayoutQ{})", cosize(SmemLayoutQ{}));
-      PRINT("cosize(SmemLayoutK{})", cosize(SmemLayoutK{}));
-  }
 
+  if (thread0()) {
+    PRINT("kBlockM", kBlockM);
+    PRINT("kBlockN", kBlockN);
+    PRINT("kHeadDim", kHeadDim);
+    PRINT("head_stride", head_stride);
+    PRINT("bs_head_offset", bs_head_offset);
+    PRINT("SmemLayoutQ", SmemLayoutQ{});
+    PRINT("SmemLayoutK", SmemLayoutK{});
+    PRINT("SmemLayoutV", SmemLayoutV{});
+    PRINT("SmemLayoutO", SmemLayoutO{});
+    PRINT("SmemLayoutVt", SmemLayoutVt{});
+    PRINT("SmemLayoutVtNoSwizzle", SmemLayoutVtNoSwizzle{});
+    PRINT("size(SmemLayoutQ{})", size(SmemLayoutQ{}));
+    PRINT("size(SmemLayoutK{})", size(SmemLayoutK{}));
+    PRINT("cosize(SmemLayoutQ{})", cosize(SmemLayoutQ{}));
+    PRINT("cosize(SmemLayoutK{})", cosize(SmemLayoutK{}));
+}
 
   auto Q = make_tensor(make_gmem_ptr<half_t>((T*)q + bs_head_offset),
                        make_shape(q_len, Int<kHeadDim>{}),
@@ -90,13 +79,12 @@ __global__ void flash_forward(void* output, const void* q, const void* k,
   auto O = make_tensor(make_gmem_ptr<half_t>((T*)output + bs_head_offset),
                        make_shape(q_len, Int<kHeadDim>{}),
                        make_stride(Int<kHeadDim>{}, Int<1>{}));
-
-  if (thread0()) {
-    PRINT("Q", Q);
-    PRINT("K", K);
-    PRINT("V", V);
-    PRINT("O", O);
-  }
+   if (thread0()) {
+  PRINT("Q", Q);
+  PRINT("K", K);
+  PRINT("V", V);
+  PRINT("O", O);
+}
 
   auto gQ = local_tile(Q, make_tile(Int<kBlockM>{}, Int<kHeadDim>{}),
                        make_coord(m_block, _));
@@ -105,28 +93,31 @@ __global__ void flash_forward(void* output, const void* q, const void* k,
   auto gV = local_tile(V, make_tile(Int<kBlockN>{}, Int<kHeadDim>{}),
                        make_coord(0, _));
 
-  if (thread0()) {
-    PRINT("gQ", gQ);
-    PRINT("gK", gK);
-    PRINT("gV", gV);
-  }
-
   auto sQ = make_tensor(make_smem_ptr<half_t>(q_shm), SmemLayoutQ{});
   auto sK = make_tensor(make_smem_ptr<half_t>(k_shm), SmemLayoutK{});
   auto sV = make_tensor(make_smem_ptr<half_t>(v_shm), SmemLayoutV{});
+
+
+ if (thread0()) {
+  PRINT("gQ", gQ);
+  PRINT("gK", gK);
+  PRINT("gV", gV);
+}
+
 
   // Tensor for V Transpose; used in GEMM-II.
   auto sVt = make_tensor(make_smem_ptr<half_t>(v_shm), SmemLayoutVt{});
   auto sVtNoSwizzle =
       make_tensor(make_smem_ptr<half_t>(v_shm), SmemLayoutVtNoSwizzle{});
 
+
   if (thread0()) {
-    PRINT("sQ", sQ);
-    PRINT("sK", sK);
-    PRINT("sV", sV);
-    PRINT("sVt", sVt);
-    PRINT("sVtNoSwizzle", sVtNoSwizzle);
-  }
+  PRINT("sQ", sQ);
+  PRINT("sK", sK);
+  PRINT("sV", sV);
+  PRINT("sVt", sVt);
+  PRINT("sVtNoSwizzle", sVtNoSwizzle);
+}
 
   GmemTiledCopyQKV gmem_tiled_copy_QKV;
   auto gmem_thr_copy_QKV = gmem_tiled_copy_QKV.get_thread_slice(tidx);
@@ -138,22 +129,20 @@ __global__ void flash_forward(void* output, const void* q, const void* k,
   auto tVsV = gmem_thr_copy_QKV.partition_D(sV);
 
 
-  // size_per_thread = block_size / thread_num = 64 * 64 / 128 = 32
   if (thread0()) {
-    PRINT("tQgQ", tQgQ);
-    PRINT("size tQgQ", size(tQgQ));
-    PRINT("tQsQ", tQsQ);
-    PRINT("size tQsQ", size(tQsQ));
-    PRINT("tKgK", tKgK);
-    PRINT("size tKgK", size(tKgK));
-    PRINT("tKsK", tKsK);
-    PRINT("size tKsK", size(tKsK));
-    PRINT("tVgV", tVgV);
-    PRINT("size tVgV", size(tVgV));
-    PRINT("tVsV", tVsV);
-    PRINT("size tVsV", size(tVsV));
-  }
-
+  PRINT("tQgQ", tQgQ);
+  PRINT("size tQgQ", size(tQgQ));
+  PRINT("tQsQ", tQsQ);
+  PRINT("size tQsQ", size(tQsQ));
+  PRINT("tKgK", tKgK);
+  PRINT("size tKgK", size(tKgK));
+  PRINT("tKsK", tKsK);
+  PRINT("size tKsK", size(tKsK));
+  PRINT("tVgV", tVgV);
+  PRINT("size tVgV", size(tVgV));
+  PRINT("tVsV", tVsV);
+  PRINT("size tVsV", size(tVsV));
+}
 
   TiledMMA tiled_mma;
   auto thr_mma = tiled_mma.get_slice(tidx);
@@ -161,14 +150,15 @@ __global__ void flash_forward(void* output, const void* q, const void* k,
   auto tSrK = thr_mma.partition_fragment_B(sK);             // (MMA,MMA_N,MMA_K)
   auto tOrVt = thr_mma.partition_fragment_B(sVtNoSwizzle);  // (MMA,MMA_K,MMA_N)
 
+
   if (thread0()) {
-    PRINT("tSrQ", tSrQ);
-    PRINT("size tSrQ", size(tSrQ));
-    PRINT("tSrK", tSrK);
-    PRINT("size tSrK", size(tSrK));
-    PRINT("tOrVt", tOrVt);
-    PRINT("size tOrVt", size(tOrVt));
-  }
+  PRINT("tSrQ", tSrQ);
+  PRINT("size tSrQ", size(tSrQ));
+  PRINT("tSrK", tSrK);
+  PRINT("size tSrK", size(tSrK));
+  PRINT("tOrVt", tOrVt);
+  PRINT("size tOrVt", size(tOrVt));
+}
 
 
   auto smem_tiled_copy_Q = make_tiled_copy_A(SmemCopyAtom{}, tiled_mma);
@@ -196,11 +186,6 @@ __global__ void flash_forward(void* output, const void* q, const void* k,
   // multiply sm scale
   half2 sm_half2 = {__float2half_rn(sm_scale), __float2half_rn(sm_scale)};
   auto tQsQ_int4 = recast<int4>(tQsQ);
-
-  if (thread0()) {
-    PRINT("tQsQ_int4", tQsQ_int4);
-  }
-
 #pragma unroll
   for (int ii = 0; ii < size(tQsQ_int4); ii++) {
     auto tmp = tQsQ_int4(ii);
@@ -221,23 +206,20 @@ __global__ void flash_forward(void* output, const void* q, const void* k,
   // copy kv
 
   // ((2,2),MMA_M,MMA_K)
+  // rAccOut存的是最终想要的 Br x d 的矩阵
   auto rAccOut =
       partition_fragment_C(tiled_mma, Shape<Int<kBlockM>, Int<kHeadDim>>{});
 
-  if (thread0()) {
-    PRINT("rAccOut", rAccOut);
-  }
-
-
-  auto scores_sum = make_tensor<float>(Shape<Int<2 * size<1>(rAccOut)>>{});  // (2*MMA_M)
+  // rAccScore存的是 中间attention score的 S矩阵
   auto rAccScore = partition_fragment_C(
       tiled_mma, make_shape(Int<kBlockM>{}, Int<kBlockN>{}));
-  clear(rAccOut);
-  // init scores_sum
-#pragma unroll
-  for (int ii = 0; ii < size(scores_sum); ii++) {
-    scores_sum(ii) = 0;
+
+  if (thread0()) {
+    PRINT("rAccOut", rAccOut);
+    PRINT("rAccScore", rAccScore);
   }
+
+  clear(rAccOut);
 
   // ((2,2),MMA_M,MMA_N) to ((2,MMA_M),(2,MMA_N))
   auto ol = logical_divide(rAccOut.layout(), Shape<Int<2>>{});
@@ -246,9 +228,28 @@ __global__ void flash_forward(void* output, const void* q, const void* k,
                   make_layout(get<0>(get<0>(ol)), get<2>(ol)));
   auto rAccOut_new = make_tensor(rAccOut.data(), rAccOut_new_layout);
 
+
+  if (thread0()) {
+    PRINT("ol", ol);
+    PRINT("rAccOut_new_layout", rAccOut_new_layout);
+    PRINT("rAccOut_new", rAccOut_new);
+  }
+
+	auto test_sl = logical_divide(rAccScore.layout(), Shape<Int<2>>{});
+	auto test_rAccScore_new_layout =
+    make_layout(make_layout(get<1>(get<0>(test_sl)), get<1>(test_sl)),
+                make_layout(get<0>(get<0>(test_sl)), get<2>(test_sl)));
+	auto test_scores = make_tensor(rAccScore.data(), test_rAccScore_new_layout);
+	if (thread0()) {
+    	PRINT("test_sl", test_sl);
+    	PRINT("test_rAccScore_new_layout",test_rAccScore_new_layout);
+    	PRINT("test_scores",test_scores );
+	}
+
+
   const int n_block_min = 0;
   int n_block_max = cute::ceil_div(k_len, kBlockN);
-#pragma unroll 1
+  #pragma unroll 1
   for (int ii = n_block_min; ii < n_block_max; ii++) {
     clear(rAccScore);
     // wait k
@@ -276,32 +277,48 @@ __global__ void flash_forward(void* output, const void* q, const void* k,
     auto rAccScore_new_layout =
         make_layout(make_layout(get<1>(get<0>(sl)), get<1>(sl)),
                     make_layout(get<0>(get<0>(sl)), get<2>(sl)));
+
+
+
+
+    // 所有线程的scores加起来应该就是小的S矩阵，size: [Br, Bc]. 注意这里是一个thread block共同持有这个S矩阵
     auto scores = make_tensor(rAccScore.data(), rAccScore_new_layout);
 
+//    if (ii == 0 && thread0()) {
+//      PRINT("sl", sl);
+//    }
 
-
-
-
-
-    if (thread0()) {
-      PRINT("sl", sl);
-      PRINT("rAccScore_new_layout", rAccScore_new_layout);
-      PRINT("scores", scores);
-
-    }
-
+    // softmax
+    auto scores_max_pre = make_fragment_like(scores_max);
+    cute::copy(scores_max, scores_max_pre);
 #pragma unroll
     for (int si = 0; si < size<0>(scores); si++) {
+      float& scores_max_si = scores_max(si);
       float& scores_sum_si = scores_sum(si);
+#pragma unroll
+      for (int sj = 0; sj < size<1>(scores); sj++) {
+        scores_max_si = max(scores_max_si, scores(si, sj));
+      }
+      scores_max_si =
+          max(scores_max_si, __shfl_xor_sync(0xffffffff, scores_max_si, 0x2));
+      scores_max_si =
+          max(scores_max_si, __shfl_xor_sync(0xffffffff, scores_max_si, 0x1));
+
+      float scores_scale = exp2f(scores_max_pre(si) - scores_max_si);
+#pragma unroll
+      for (int sj = 0; sj < size<1>(rAccOut_new); sj++) {
+        rAccOut_new(si, sj) *= scores_scale;
+      }
 
       float scores_sum_cur_si = 0;
 #pragma unroll
       for (int sj = 0; sj < size<1>(scores); sj++) {
+        scores(si, sj) = exp2f(scores(si, sj) - scores_max_si);
         scores_sum_cur_si += scores(si, sj);
       }
       scores_sum_cur_si += __shfl_xor_sync(0xffffffff, scores_sum_cur_si, 0x2);
       scores_sum_cur_si += __shfl_xor_sync(0xffffffff, scores_sum_cur_si, 0x1);
-      scores_sum_si = scores_sum_si + scores_sum_cur_si;
+      scores_sum_si = scores_sum_si * scores_scale + scores_sum_cur_si;
     }
 
     __syncthreads();
@@ -333,6 +350,12 @@ __global__ void flash_forward(void* output, const void* q, const void* k,
                                 get<0>(get<1>(get<1>(l)))),
                     get<1>(get<0>(l)), get<1>(get<1>(get<1>(l))));
     auto tOrS = make_tensor(scores_fp16.data(), scores_new_layout);
+
+//    if (thread0()) {
+//      PRINT("l", l);
+//      PRINT("scores_new_layout", scores_new_layout);
+//      PRINT("tOrS", tOrS);
+//    }
 
     cute::copy(smem_tiled_copy_V, tOsVt(_, _, Int<0>{}),
                tOrVt_view(_, _, Int<0>{}));
@@ -366,11 +389,6 @@ __global__ void flash_forward(void* output, const void* q, const void* k,
     for (int oj = 0; oj < size<1>(rAccOut_new); oj++) {
       rAccOut_new(oi, oj) *= scores_sum(oi);
     }
-  }
-
-  if (thread0()) {
-    PRINT("rAccOut_new", rAccOut_new);
-    PRINT("scores_sum", scores_sum);
   }
 
   // write back
@@ -484,6 +502,7 @@ struct FlashConfig {
 };
 
 }  // namespace config
+
 
 torch::Tensor forward_no_softmax(torch::Tensor q, torch::Tensor k, torch::Tensor v) {
   int bs = q.size(0);
