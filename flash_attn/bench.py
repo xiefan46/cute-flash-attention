@@ -106,7 +106,7 @@ def test_no_softmax(q, k, v):
 set_seed(10086)
 B = 2
 H = 16
-N = 128
+N = 64
 # NOTE: we only support d = 64!
 d = 64
 

@@ -2,6 +2,7 @@
 #include <cuda_fp16.h>
 #include <cuda_runtime.h>
 #include <torch/types.h>
+#include <iostream>
 
 #include <cute/tensor.hpp>
 
@@ -460,6 +461,10 @@ torch::Tensor forward_no_softmax(torch::Tensor q, torch::Tensor k, torch::Tensor
   auto out = torch::empty_like(q);
 
   float sm_scale = 1.0 / sqrt(head_dim);
+
+  int bx = (q_len + config.kBlockM - 1) / config.kBlockM
+  std::cout<<"q len: "<<q_len<" bx:"<<bx<std::endl;
+
 
   // only for head_dim=64
   config::FlashConfig<cute::half_t> config;
