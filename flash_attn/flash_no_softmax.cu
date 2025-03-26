@@ -462,12 +462,15 @@ torch::Tensor forward_no_softmax(torch::Tensor q, torch::Tensor k, torch::Tensor
 
   float sm_scale = 1.0 / sqrt(head_dim);
 
-  int bx = (q_len + config.kBlockM - 1) / config.kBlockM;
-  std::cout<<"q len: "<<q_len<" bx:"<<bx<std::endl;
+
 
 
   // only for head_dim=64
   config::FlashConfig<cute::half_t> config;
+
+  int bx = (q_len + config.kBlockM - 1) / config.kBlockM;
+  std::cout<<"q len: "<<q_len<" bx:"<<bx<std::endl;
+
   dim3 block = config.kThreadNum;
   dim3 grid((q_len + config.kBlockM - 1) / config.kBlockM, bs * head_num);
   int shm_size = config.kShmSize;
