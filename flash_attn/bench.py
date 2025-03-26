@@ -110,9 +110,9 @@ N = 64
 # NOTE: we only support d = 64!
 d = 64
 
-q = torch.randn(B, H, N, d).cuda().half()
-k = torch.randn(B, H, N, d).cuda().half()
-v = torch.randn(B, H, N, d).cuda().half()
+q = torch.randn(B, N, H, d).cuda().half()
+k = torch.randn(B, N, H, d).cuda().half()
+v = torch.randn(B, N, H, d).cuda().half()
 q1 = q.transpose(1, 2).contiguous()
 k1 = k.transpose(1, 2).contiguous()
 v1 = v.transpose(1, 2).contiguous()
