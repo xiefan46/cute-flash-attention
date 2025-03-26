@@ -284,43 +284,6 @@ __global__ void flash_forward(void* output, const void* q, const void* k,
     // 所有线程的scores加起来应该就是小的S矩阵，size: [Br, Bc]. 注意这里是一个thread block共同持有这个S矩阵
     auto scores = make_tensor(rAccScore.data(), rAccScore_new_layout);
 
-//    if (ii == 0 && thread0()) {
-//      PRINT("sl", sl);
-//    }
-
-    // softmax
-    auto scores_max_pre = make_fragment_like(scores_max);
-    cute::copy(scores_max, scores_max_pre);
-#pragma unroll
-    for (int si = 0; si < size<0>(scores); si++) {
-      float& scores_max_si = scores_max(si);
-      float& scores_sum_si = scores_sum(si);
-#pragma unroll
-      for (int sj = 0; sj < size<1>(scores); sj++) {
-        scores_max_si = max(scores_max_si, scores(si, sj));
-      }
-      scores_max_si =
-          max(scores_max_si, __shfl_xor_sync(0xffffffff, scores_max_si, 0x2));
-      scores_max_si =
-          max(scores_max_si, __shfl_xor_sync(0xffffffff, scores_max_si, 0x1));
-
-      float scores_scale = exp2f(scores_max_pre(si) - scores_max_si);
-#pragma unroll
-      for (int sj = 0; sj < size<1>(rAccOut_new); sj++) {
-        rAccOut_new(si, sj) *= scores_scale;
-      }
-
-      float scores_sum_cur_si = 0;
-#pragma unroll
-      for (int sj = 0; sj < size<1>(scores); sj++) {
-        scores(si, sj) = exp2f(scores(si, sj) - scores_max_si);
-        scores_sum_cur_si += scores(si, sj);
-      }
-      scores_sum_cur_si += __shfl_xor_sync(0xffffffff, scores_sum_cur_si, 0x2);
-      scores_sum_cur_si += __shfl_xor_sync(0xffffffff, scores_sum_cur_si, 0x1);
-      scores_sum_si = scores_sum_si * scores_scale + scores_sum_cur_si;
-    }
-
     __syncthreads();
     // advance k
     if (ii != n_block_max - 1) {
@@ -351,11 +314,6 @@ __global__ void flash_forward(void* output, const void* q, const void* k,
                     get<1>(get<0>(l)), get<1>(get<1>(get<1>(l))));
     auto tOrS = make_tensor(scores_fp16.data(), scores_new_layout);
 
-//    if (thread0()) {
-//      PRINT("l", l);
-//      PRINT("scores_new_layout", scores_new_layout);
-//      PRINT("tOrS", tOrS);
-//    }
 
     cute::copy(smem_tiled_copy_V, tOsVt(_, _, Int<0>{}),
                tOrVt_view(_, _, Int<0>{}));
@@ -377,20 +335,6 @@ __global__ void flash_forward(void* output, const void* q, const void* k,
     }
     cp_async_fence();
   }
-
-  // normalize d
-#pragma unroll
-  for (int si = 0; si < size(scores_sum); si++) {
-    scores_sum(si) = __frcp_rn(scores_sum(si));
-  }
-#pragma unroll
-  for (int oi = 0; oi < size<0>(rAccOut_new); oi++) {
-#pragma unroll
-    for (int oj = 0; oj < size<1>(rAccOut_new); oj++) {
-      rAccOut_new(oi, oj) *= scores_sum(oi);
-    }
-  }
-
   // write back
   auto rAccOut_fp16 = make_tensor_like<half_t>(rAccOut);
   auto rAccOut_fp32x2 = recast<float2>(rAccOut);
