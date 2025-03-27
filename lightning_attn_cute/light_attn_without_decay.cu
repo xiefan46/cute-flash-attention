@@ -173,7 +173,8 @@ torch::Tensor forward_without_decay(torch::Tensor q, torch::Tensor k, torch::Ten
   // only for head_dim=64
   config::FlashConfig<cute::half_t> config;
   dim3 block = config.kThreadNum;
-  dim3 grid(B * H);
+  // dim3 grid(B * H);
+  dim3 grid(1);
   auto partition_kernel = flash_forward<decltype(config)>;
   PRINT("grid", grid);
   PRINT("block", block);
