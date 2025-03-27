@@ -156,8 +156,6 @@ torch::Tensor forward_without_decay(torch::Tensor q, torch::Tensor k, torch::Ten
   PRINT("grid", grid);
   PRINT("block", block);
 
-  partition_kernel<<<grid, block, shm_size>>>(
-      (const void*)q.data_ptr(),
-      (const void*)k.data_ptr(), (const void*)v.data_ptr(), (void*)out.data_ptr(), B, H, N);
+  partition_kernel<<<grid, block, shm_size>>>( q.data_ptr(), k.data_ptr(), v.data_ptr(), out.data_ptr(), B, H, N);
   return out;
 }
