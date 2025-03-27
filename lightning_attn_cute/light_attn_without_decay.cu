@@ -93,6 +93,10 @@ __global__ void flash_forward(const half_t* q, const half_t* k, const half_t* v,
   TiledMMA mma;
   ThrMMA thr_mma = mma.get_slice(tx);
 
+  if (thread0()) {
+    PRINT("mma size", size(mma));
+  }
+
   Tensor kv = make_tensor<half_t>(make_shape(Int<kHeadDim>{}, Int<kHeadDim>{})); // d x d
   cute::clear(kv);
   for (int block_id = 0; block_id < num_block; block_id++) {
@@ -113,11 +117,16 @@ __global__ void flash_forward(const half_t* q, const half_t* k, const half_t* v,
     clear(tCrS);
     if (thread0()) {
       PRINT("tCrS", tCrS);
+      cute::print_tensor(tCrS);
     }
 
-//    __syncthreads();
-//
-//    cute::gemm(mma, tArQ, tBrK, tCrS);
+	__syncthreads();
+
+    cute::gemm(mma, tArQ, tBrK, tCrS);
+
+    if (thread0()) {
+      cute::print_tensor(tCrS);
+    }
 //
 //    // 读入v 并且计算 o_intra = s @ v [BLOCK, BLOCK] @ [BLOCK, d] -> [BLOCK, d]
 //    // Tensor tArS = thr_mma.partition_fragment_A(tCrS);
