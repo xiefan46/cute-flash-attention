@@ -96,6 +96,7 @@ struct FlashConfig {
 
 }  // namespace config
 
+
 template <typename config>
 __global__ void flash_forward(const void* Q, const void* K, const void* V, void* O, const void* slopes,
                               const int B, const int H, const int N) {

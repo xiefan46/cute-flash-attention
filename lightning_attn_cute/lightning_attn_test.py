@@ -28,11 +28,8 @@ torch.manual_seed(0)
 # Load the CUDA kernel as a python module
 myflash = load(name='myflash', 
                     sources=[
-                        'main.cpp', 
-                        # 'flash.cu',
-                        'flash_no_softmax.cu',
-                        # 'flash_no_softmax_no_normal.cu'
-                        # 'compute_qk.cu'
+                        'main.cpp',
+                        'light_attn_without_decay.cu',
                     ], 
                     extra_cuda_cflags=[
                         '-O2', 
@@ -90,12 +87,8 @@ def set_seed(seed=42):
 
 
 
-def test_no_softmax(q, k, v):
-    a = manual_attn(q1, k1, v1, use_softmax=False)
-    b = myflash.forward_no_softmax(q1, k1, v1)
-    print(f"a: {a[0,0, :, :]}")
-    print(f"b: {b[0,0,:, :]}")
-    print('attn values sanity check:', torch.allclose(a, b, rtol=1e-03, atol=1e-03))
+def test_forward_without_decay(q, k, v):
+    b = myflash.forward_without_decay(q, k, v)
 
 # index = block_off[:, None] - block_off[None, :]  # 相对位置 BLOCK x BLOCK
 # s_index = -slope * index  # BLOCK * BLOCK
@@ -119,4 +112,4 @@ q1 = q.transpose(1, 2).contiguous()
 k1 = k.transpose(1, 2).contiguous()
 v1 = v.transpose(1, 2).contiguous()
 
-test_no_softmax(q1, k1, v1)
+test_forward_without_decay(q1, k1, v1)
