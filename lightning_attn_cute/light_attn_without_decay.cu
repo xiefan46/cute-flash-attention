@@ -152,7 +152,7 @@ torch::Tensor forward_without_decay(torch::Tensor q, torch::Tensor k, torch::Ten
   PRINT("grid", grid);
   PRINT("block", block);
 
-  partition_kernel<<<grid, block, shm_size>>>((cute::half_t*)q.data_ptr(), (cute::half_t*)k.data_ptr(),
+  partition_kernel<<<grid, block>>>((cute::half_t*)q.data_ptr(), (cute::half_t*)k.data_ptr(),
                                               (cute::half_t*)v.data_ptr(), (cute::half_t*)out.data_ptr(), B, H, N);
   return out;
 }
