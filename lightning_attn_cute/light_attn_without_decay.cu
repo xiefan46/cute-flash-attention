@@ -106,8 +106,7 @@ __global__ void flash_forward(const half_t* q, const half_t* k, const half_t* v,
 
   Tensor kv = make_tensor<half_t>(make_shape(Int<kHeadDim>{}, Int<kHeadDim>{})); // d x d
   cute::clear(kv);
-  int block_id = 0;
-//  for (int block_id = 0; block_id < num_block; block_id++) {
+  for (int block_id = 0; block_id < num_block; block_id++) {
     Tensor gQ = local_tile(Q, make_tile(Int<BLOCK>{}, Int<kHeadDim>{}), make_coord(block_id, 0)); //BLOCK x d
     Tensor gK = local_tile(K, make_tile(Int<BLOCK>{}, Int<kHeadDim>{}), make_coord(block_id, 0)); //BLOCK x d
     Tensor gVt = local_tile(Vt, make_tile(Int<kHeadDim>{}, Int<BLOCK>{}), make_coord(0, block_id)); //d x BLOCK
@@ -146,8 +145,8 @@ __global__ void flash_forward(const half_t* q, const half_t* k, const half_t* v,
     if (thread0()) {
       // PRINT_TENSOR("tCrS after partition fragment", tCrS);
       // PRINT_TENSOR("tArS after partition fragment", tArS);
-      PRINT("tCrS", tCrS);
-      PRINT("tArS", tArS);
+      PRINT_TENSOR("tCrS", tCrS);
+      PRINT_TENSOR("tArS", tArS);
     }
 
 //	Tensor tBgVt = thr_mma.partition_B(gVt);
@@ -159,7 +158,7 @@ __global__ void flash_forward(const half_t* q, const half_t* k, const half_t* v,
 //
 //    // 计算 o_inter = tl.dot(q, kv)
 
-  //}
+  }
 
 }
 
