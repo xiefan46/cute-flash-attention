@@ -73,6 +73,9 @@ struct FlashConfig {
 template <typename config>
 __global__ void flash_forward(const half_t* q, const half_t* k, const half_t* v, half_t* o, const int B, const int H, const int N) {
   using namespace cute;
+  using TiledMMA = typename config::TiledMMA;
+
+
   constexpr int BLOCK = config::BLOCK;
   constexpr int kHeadDim = config::kHeadDim;
 
@@ -88,7 +91,7 @@ __global__ void flash_forward(const half_t* q, const half_t* k, const half_t* v,
   Tensor K = make_tensor(make_gmem_ptr<half_t>(k + bs_head_offset), make_shape(N, Int<kHeadDim>{}), make_stride(Int<kHeadDim>{}, Int<1>{})); // N x d
   Tensor Vt = make_tensor(make_gmem_ptr<half_t>(v + bs_head_offset), make_shape(Int<kHeadDim>{}, N), make_stride(Int<1>{}, Int<kHeadDim>{})); // d x N
 
-  config::TiledMMA mma;
+  TiledMMA mma;
 //  ThrMMA thr_mma = mma.get_slice(tx);
 //
 //  Tensor kv = make_tensor(make_shape(Int<kHeadDim>, Int<kHeadDim>)); // d x d
