@@ -102,19 +102,19 @@ __global__ void flash_forward(const half_t* q, const half_t* k, const half_t* v,
     Tensor gVt = local_tile(Vt, make_tile(Int<kHeadDim>{}, Int<BLOCK>{}), make_coord(0, block_id)); //d x BLOCK
 
     // compute q @ k.T BLOCK x BLOCK
-//    Tensor tAgQ = thr_mma.partition_A(gQ);
-//    Tensor tArQ = thr_mma.partition_fragment_A(gQ);
-//    Tensor tBgK = thr_mma.partition_B(gK);
-//    Tensor tBrK = thr_mma.partition_fragment_B(gK);
-//
-//    cute::copy(tAgQ, tArQ);
-//    cute::copy(tBgK, tBrK);
-//
-//    Tensor tCrS = thr_mma.partition_fragment_C(make_shape(Int<BLOCK>{}, Int<BLOCK>{})); //BLOCK x BLOCK
-//    clear(tCrS);
-//    __syncthreads();
-//
-//    cute:gemm(mma, tArQ, tBrK, tCrS);
+    Tensor tAgQ = thr_mma.partition_A(gQ);
+    Tensor tArQ = thr_mma.partition_fragment_A(gQ);
+    Tensor tBgK = thr_mma.partition_B(gK);
+    Tensor tBrK = thr_mma.partition_fragment_B(gK);
+
+    cute::copy(tAgQ, tArQ);
+    cute::copy(tBgK, tBrK);
+
+    Tensor tCrS = thr_mma.partition_fragment_C(make_shape(Int<BLOCK>{}, Int<BLOCK>{})); //BLOCK x BLOCK
+    clear(tCrS);
+    __syncthreads();
+
+    cute:gemm(mma, tArQ, tBrK, tCrS);
 //
 //    // 读入v 并且计算 o_intra = s @ v [BLOCK, BLOCK] @ [BLOCK, d] -> [BLOCK, d]
 //    // Tensor tArS = thr_mma.partition_fragment_A(tCrS);
