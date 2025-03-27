@@ -94,7 +94,7 @@ __global__ void flash_forward(const half_t* q, const half_t* k, const half_t* v,
   TiledMMA mma;
   ThrMMA thr_mma = mma.get_slice(tx);
 
-  Tensor kv = make_tensor(make_shape(Int<kHeadDim>, Int<kHeadDim>)); // d x d
+  Tensor kv = make_tensor(make_shape(Int<kHeadDim>{}, Int<kHeadDim>{})); // d x d
   cute::fill(kv, 0);
   for (int block_id = 0; block_id < num_block; block_id++) {
     Tensor gQ = local_tile(Q, make_tile(Int<BLOCK>{}, Int<kHeadDim>{}), make_coord(block_id, 0)); //BLOCK x d
