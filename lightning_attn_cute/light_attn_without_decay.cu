@@ -71,7 +71,7 @@ struct FlashConfig {
 // 3. gmem到smem的copy似乎没有流水线
 // 4. 给smem增加static check. 参考 https://github.com/NVIDIA/cutlass/blob/main/media/docs/cute/0x_gemm_tutorial.md
 template <typename config>
-__global__ void flash_forward(const half_t* Q, const half_t* K, const half_t* V, half_t* O, const int B, const int H, const int N) {
+__global__ void flash_forward(const half_t* q, const half_t* k, const half_t* v, half_t* o, const int B, const int H, const int N) {
   using namespace cute;
   constexpr int BLOCK = config::BLOCK;
   constexpr int kHeadDim = config::kHeadDim;
@@ -80,63 +80,62 @@ __global__ void flash_forward(const half_t* Q, const half_t* K, const half_t* V,
   const int bx = blockIdx.x;
   const int head_id = bx % H;
   const int tx = threadIdx.x;
-  const int slope = slopes[head_id];
   const int bs_head_offset = bx * N * kHeadDim;
-  const int num_block = N / kBlockM;
+  const int num_block = N / BLOCK;
 
 
-  Tensor Q = make_tensor(make_gmem_ptr<half_t>((T*)q + bs_head_offset), make_shape(N, Int<kHeadDim>{}), make_stride(Int<kHeadDim>{}, Int<1>{})); // N x d
-  Tensor K = make_tensor(make_gmem_ptr<half_t>((T*)k + bs_head_offset), make_shape(N, Int<kHeadDim>{}), make_stride(Int<kHeadDim>{}, Int<1>{})); // N x d
-  Tensor Vt = make_tensor(make_gmem_ptr<half_t>((T*)v + bs_head_offset), make_shape(Int<kHeadDim>{}, N>{}), make_stride(Int<1>{}, Int<kHeadDim>{})); // d x N
+  Tensor Q = make_tensor(make_gmem_ptr<half_t>(q + bs_head_offset), make_shape(N, Int<kHeadDim>{}), make_stride(Int<kHeadDim>{}, Int<1>{})); // N x d
+  Tensor K = make_tensor(make_gmem_ptr<half_t>(k + bs_head_offset), make_shape(N, Int<kHeadDim>{}), make_stride(Int<kHeadDim>{}, Int<1>{})); // N x d
+  Tensor Vt = make_tensor(make_gmem_ptr<half_t>(v + bs_head_offset), make_shape(Int<kHeadDim>{}, N>{}), make_stride(Int<1>{}, Int<kHeadDim>{})); // d x N
 
   config::TiledMMA mma;
   ThrMMA thr_mma = mma.get_slice(tx);
 
   Tensor kv = make_tensor(make_shape(Int<kHeadDim>, Int<kHeadDim>)); // d x d
   cute::fill(kv, 0);
-  for (int block_id = 0; block_id < num_block; block_id++) {
-    Tensor gQ = local_tile(Q, make_tile(Int<BLOCK>{}, Int<kHeadDim>{}), make_coord(block_id, 0)); //BLOCK x d
-    Tensor gK = local_tile(K, make_tile(Int<BLOCK>{}, Int<kHeadDim>{}), make_coord(block_id, 0)); //BLOCK x d
-    Tensor gVt = local_tile(Vt, make_tile(Int<kHeadDim>{}, Int<BLOCK>{}), make_coord(0, block_id)); //d x BLOCK
-
-    // compute q @ k.T BLOCK x BLOCK
-    Tensor tAgQ = thr_mma.partition_A(gQ);
-    Tensor tArQ = thr_mma.partition_fragment_A(gQ);
-    Tensor tBgK = thr_mma.partition_B(gK);
-    Tensor tBrK = thr_mma.partition_fragment_B(gK);
-
-    cute::copy(tAgQ, tArQ);
-    cute::copy(tBgK, tBrK);
-
-    Tensor tCrS = thr_mma.partition_fragment_C(make_shape(Int<BLOCK>{}, Int<BLOCK>{})); //BLOCK x BLOCK
-    clear(tCrS);
-    __syncthreads();
-
-    cute:gemm(mma, tArQ, tBrK, tCrS);
-
-    // 读入v 并且计算 o_intra = s @ v [BLOCK, BLOCK] @ [BLOCK, d] -> [BLOCK, d]
-    // Tensor tArS = thr_mma.partition_fragment_A(tCrS);
-    Tensor tArS = thr_mma.partition_fragment_A(make_shape(Int<BLOCK>{}, Int<BLOCK>{}));
-    cute::copy(tCrS, tArS);
-
-	Tensor tBgVt = thr_mma.partition_B(gVt);
-    Tensor tBrVt = thr_mma.partition_fragment_B(gVt);
-    Tensor tCrO_intra = thr_mma.partition_fragment_C(make_shape(Int<BLOCK>{}, Int<kHeadDim>{})); //BLOCK x d
-    cute::clear(tCrO_intra);
-    cute::gemm(tArS, tBrVt, tCrO_intra);
-
-
-    // 计算 o_inter = tl.dot(q, kv)
-
-  }
+//  for (int block_id = 0; block_id < num_block; block_id++) {
+//    Tensor gQ = local_tile(Q, make_tile(Int<BLOCK>{}, Int<kHeadDim>{}), make_coord(block_id, 0)); //BLOCK x d
+//    Tensor gK = local_tile(K, make_tile(Int<BLOCK>{}, Int<kHeadDim>{}), make_coord(block_id, 0)); //BLOCK x d
+//    Tensor gVt = local_tile(Vt, make_tile(Int<kHeadDim>{}, Int<BLOCK>{}), make_coord(0, block_id)); //d x BLOCK
+//
+//    // compute q @ k.T BLOCK x BLOCK
+//    Tensor tAgQ = thr_mma.partition_A(gQ);
+//    Tensor tArQ = thr_mma.partition_fragment_A(gQ);
+//    Tensor tBgK = thr_mma.partition_B(gK);
+//    Tensor tBrK = thr_mma.partition_fragment_B(gK);
+//
+//    cute::copy(tAgQ, tArQ);
+//    cute::copy(tBgK, tBrK);
+//
+//    Tensor tCrS = thr_mma.partition_fragment_C(make_shape(Int<BLOCK>{}, Int<BLOCK>{})); //BLOCK x BLOCK
+//    clear(tCrS);
+//    __syncthreads();
+//
+//    cute:gemm(mma, tArQ, tBrK, tCrS);
+//
+//    // 读入v 并且计算 o_intra = s @ v [BLOCK, BLOCK] @ [BLOCK, d] -> [BLOCK, d]
+//    // Tensor tArS = thr_mma.partition_fragment_A(tCrS);
+//    Tensor tArS = thr_mma.partition_fragment_A(make_shape(Int<BLOCK>{}, Int<BLOCK>{}));
+//    cute::copy(tCrS, tArS);
+//
+//	Tensor tBgVt = thr_mma.partition_B(gVt);
+//    Tensor tBrVt = thr_mma.partition_fragment_B(gVt);
+//    Tensor tCrO_intra = thr_mma.partition_fragment_C(make_shape(Int<BLOCK>{}, Int<kHeadDim>{})); //BLOCK x d
+//    cute::clear(tCrO_intra);
+//    cute::gemm(tArS, tBrVt, tCrO_intra);
+//
+//
+//    // 计算 o_inter = tl.dot(q, kv)
+//
+//  }
 
 }
 
 
 
 
-// q [B, H, N, d] k  [B, H, N, d] v [B, H, N, d] slope [H]
-torch::Tensor forward_without_decay(torch::Tensor q, torch::Tensor k, torch::Tensor v, torch::Tensor slope) {
+// q [B, H, N, d] k  [B, H, N, d] v [B, H, N, d]
+torch::Tensor forward_without_decay(torch::Tensor q, torch::Tensor k, torch::Tensor v) {
   int B = q.size(0);
   int H = q.size(1);
   int N = q.size(2);
