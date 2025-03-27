@@ -148,6 +148,9 @@ __global__ void flash_forward(const void* Q, const void* K, const void* V, void*
   const int bs_head_offset = bx * N * kHeadDim;
 
 
+  // 在python侧构造出diag矩阵并且传进来
+
+
 
   auto Q = make_tensor(make_gmem_ptr<half_t>((T*)q + bs_head_offset), make_shape(N, Int<kHeadDim>>{}), make_stride(Int<kHeadDim>>{}, _1));
   auto K = make_tensor(make_gmem_ptr<half_t>((T*)k + bs_head_offset), make_shape(N, Int<kHeadDim>>{}), make_stride(Int<kHeadDim>>{}, _1));
@@ -163,8 +166,7 @@ __global__ void flash_forward(const void* Q, const void* K, const void* V, void*
 
   auto gQ = local_tile(Q, make_tile(Int<kBlockM>{}, d), make_coord(bx, _));
   auto gK = local_tile(K, make_tile(Int<kBlockN>{}, Int<kHeadDim>{}), make_coord(0, _));
-  auto gV = local_tile(V, make_tile(Int<kBlockN>{}, Int<kHeadDim>{}),
-                       make_coord(0, _));
+  auto gV = local_tile(V, make_tile(Int<kBlockN>{}, Int<kHeadDim>{}), make_coord(0, _));
 
   auto sQ = make_tensor(make_smem_ptr<half_t>(q_shm), SmemLayoutQ{});
   auto sK = make_tensor(make_smem_ptr<half_t>(k_shm), SmemLayoutK{});

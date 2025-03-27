@@ -2,7 +2,6 @@
 #include <cuda_fp16.h>
 #include <cuda_runtime.h>
 #include <torch/types.h>
-#include <iostream>
 
 #include <cute/tensor.hpp>
 
@@ -14,15 +13,16 @@ using namespace cute;
     print(content);          \
     print("\n");
 
+
 namespace config {
 using namespace cute;
 
-template <typename T_, int kHeadDim_ = 64, int kBlockM_ = 64, int kBlockN_ = 64>
+// BLOCK 用于外层for循环, q, k, v三个矩阵每次切出来 BLOCK x d大小的矩阵加载到smem
+template <typename T_, int kHeadDim_ = 64, int BLOCK_ = 64>
 struct FlashConfig {
   using T = T_;
   static constexpr int kHeadDim = kHeadDim_;
-  static constexpr int kBlockM = kBlockM_;
-  static constexpr int kBlockN = kBlockN_;
+  static constexpr int BLOCK = BLOCK_;
 
   static constexpr int kBlockKSmem = kHeadDim % 64 == 0 ? 64 : 32;
   static constexpr int kBlockKGmem =
@@ -32,20 +32,20 @@ struct FlashConfig {
       Swizzle<kSwizzle, 3, 3>{}, Layout<Shape<Int<8>, Int<kBlockKSmem>>,
                                         Stride<Int<kBlockKSmem>, Int<1>>>{}));
   using SmemLayoutQ = decltype(tile_to_shape(
-      SmemLayoutAtom{}, Shape<Int<kBlockM>, Int<kHeadDim>>{}));
+      SmemLayoutAtom{}, Shape<Int<BLOCK>, Int<kHeadDim>>{}));
   using SmemLayoutKV = decltype(tile_to_shape(
-      SmemLayoutAtom{}, Shape<Int<kBlockN>, Int<kHeadDim>>{}));
+      SmemLayoutAtom{}, Shape<Int<BLOCK>, Int<kHeadDim>>{}));
 
   using SmemLayoutAtomVtransposedNoSwizzle =
-      Layout<Shape<Int<kBlockKSmem>, Int<kBlockN>>,
+      Layout<Shape<Int<kBlockKSmem>, Int<BLOCK>>,
              Stride<Int<1>, Int<kBlockKSmem>>>;
   using SmemLayoutAtomVtransposed = decltype(composition(
       Swizzle<kSwizzle, 3, 3>{}, SmemLayoutAtomVtransposedNoSwizzle{}));
   using SmemLayoutVtransposed = decltype(tile_to_shape(
-      SmemLayoutAtomVtransposed{}, Shape<Int<kHeadDim>, Int<kBlockN>>{}));
+      SmemLayoutAtomVtransposed{}, Shape<Int<kHeadDim>, Int<BLOCK>>{}));
   using SmemLayoutVtransposedNoSwizzle =
       decltype(tile_to_shape(SmemLayoutAtomVtransposedNoSwizzle{},
-                             Shape<Int<kHeadDim>, Int<kBlockN>>{}));
+                             Shape<Int<kHeadDim>, Int<BLOCK>>{}));
 
   using SmemCopyAtom = Copy_Atom<SM75_U32x4_LDSM_N, T>;
   using SmemCopyAtomTransposed = Copy_Atom<SM75_U16x8_LDSM_T, T>;
@@ -53,7 +53,7 @@ struct FlashConfig {
       Swizzle<kSwizzle, 3, 3>{}, Layout<Shape<Int<8>, Int<kBlockKSmem>>,
                                         Stride<Int<kBlockKSmem>, Int<1>>>{}));
   using SmemLayoutO = decltype(tile_to_shape(
-      SmemLayoutAtomO{}, Shape<Int<kBlockM>, Int<kHeadDim>>{}));
+      SmemLayoutAtomO{}, Shape<Int<BLOCK>, Int<kHeadDim>>{}));
   using SmemCopyAtomO = Copy_Atom<DefaultCopy, T>;
 
   using mma_op = SM80_16x8x16_F32F16F16F32_TN;
@@ -97,148 +97,77 @@ struct FlashConfig {
 }  // namespace config
 
 
+
+// TODO:
+// 1. smem要怎么处理才能避免相互覆盖的问题
+// 2. smem如何处理多stage
+// 3. gmem到smem的copy似乎没有流水线
+// 4. 给smem增加static check. 参考 https://github.com/NVIDIA/cutlass/blob/main/media/docs/cute/0x_gemm_tutorial.md
 template <typename config>
-__global__ void flash_forward(void* output, const void* q, const void* k,
-                              const void* v, int head_stride, int q_len,
-                              int k_len, float sm_scale) {
+__global__ void flash_forward(const void* Q, const void* K, const void* V, void* O, const int B, const int H, const int N) {
   using namespace cute;
   using X = Underscore;
-  const int m_block = blockIdx.x;
-  const int base_id = blockIdx.y;
-  const int tidx = threadIdx.x;
-
   using T = typename config::T;
-  using SmemLayoutQ = typename config::SmemLayoutQ;
-  using SmemLayoutK = typename config::SmemLayoutKV;
-  using SmemLayoutV = typename config::SmemLayoutKV;
-  using SmemLayoutO = typename config::SmemLayoutO;
-  using SmemCopyAtom = typename config::SmemCopyAtom;
-  using SmemCopyAtomO = typename config::SmemCopyAtomO;
-  using GmemTiledCopyQKV = typename config::GmemTiledCopyQKV;
-  using GmemTiledCopyO = typename config::GmemTiledCopyO;
-  using SmemCopyAtomTransposed = typename config::SmemCopyAtomTransposed;
-  using TiledMMA = typename config::TiledMMA;
-  using SmemLayoutVt = typename config::SmemLayoutVtransposed;
-  using SmemLayoutVtNoSwizzle = typename config::SmemLayoutVtransposedNoSwizzle;
-
-  constexpr int kBlockM = config::kBlockM;
-  constexpr int kBlockN = config::kBlockN;
+  constexpr int BLOCK = config::BLOCK;
   constexpr int kHeadDim = config::kHeadDim;
 
-  extern __shared__ T shm_data[];
-  auto q_shm = shm_data;
-  auto k_shm = q_shm + cosize(SmemLayoutQ{});
-  auto v_shm = k_shm + cosize(SmemLayoutK{});
 
-  const int bs_head_offset = base_id * head_stride;
+    extern __shared__ T shm_data[];
+    auto q_shm = shm_data;
+    auto k_shm = q_shm + cosize(config::SmemLayoutQ{});
+    auto v_shm = k_shm + cosize(config::SmemLayoutK{});
 
+    const int bx = blockIdx.x;
+    const int head_id = bx % H;
+    const int tx = threadIdx.x;
+    const int slope = slopes[head_id];
+    const int bs_head_offset = bx * N * kHeadDim;
+    const int num_block = N / kBlockM;
 
-  if (thread0()) {
-    PRINT("kBlockM", kBlockM);
-    PRINT("kBlockN", kBlockN);
-    PRINT("kHeadDim", kHeadDim);
-    PRINT("head_stride", head_stride);
-    PRINT("bs_head_offset", bs_head_offset);
-    PRINT("SmemLayoutQ", SmemLayoutQ{});
-    PRINT("SmemLayoutK", SmemLayoutK{});
-    PRINT("SmemLayoutV", SmemLayoutV{});
-    PRINT("SmemLayoutO", SmemLayoutO{});
-    PRINT("SmemLayoutVt", SmemLayoutVt{});
-    PRINT("SmemLayoutVtNoSwizzle", SmemLayoutVtNoSwizzle{});
-    PRINT("size(SmemLayoutQ{})", size(SmemLayoutQ{}));
-    PRINT("size(SmemLayoutK{})", size(SmemLayoutK{}));
-    PRINT("cosize(SmemLayoutQ{})", cosize(SmemLayoutQ{}));
-    PRINT("cosize(SmemLayoutK{})", cosize(SmemLayoutK{}));
-}
+    auto Q = make_tensor(make_gmem_ptr<half_t>((T*)q + bs_head_offset), make_shape(N, Int<kHeadDim>>{}), make_stride(Int<kHeadDim>>{}, _1));
+    auto K = make_tensor(make_gmem_ptr<half_t>((T*)k + bs_head_offset), make_shape(N, Int<kHeadDim>>{}), make_stride(Int<kHeadDim>>{}, _1));
+    auto V = make_tensor(make_gmem_ptr<half_t>((T*)v + bs_head_offset), make_shape(N, Int<kHeadDim>>{}), make_stride(Int<kHeadDim>>{}, _1));
+    auto O = make_tensor(make_gmem_ptr<half_t>((T*)output + bs_head_offset), make_shape(N, Int<kHeadDim>>{}), make_stride(Int<kHeadDim>>{}, _1));
 
-  auto Q = make_tensor(make_gmem_ptr<half_t>((T*)q + bs_head_offset),
-                       make_shape(q_len, Int<kHeadDim>{}),
-                       make_stride(Int<kHeadDim>{}, Int<1>{}));
-  auto K = make_tensor(make_gmem_ptr<half_t>((T*)k + bs_head_offset),
-                       make_shape(k_len, Int<kHeadDim>{}),
-                       make_stride(Int<kHeadDim>{}, Int<1>{}));
-  auto V = make_tensor(make_gmem_ptr<half_t>((T*)v + bs_head_offset),
-                       make_shape(k_len, Int<kHeadDim>{}),
-                       make_stride(Int<kHeadDim>{}, Int<1>{}));
-  auto O = make_tensor(make_gmem_ptr<half_t>((T*)output + bs_head_offset),
-                       make_shape(q_len, Int<kHeadDim>{}),
-                       make_stride(Int<kHeadDim>{}, Int<1>{}));
-   if (thread0()) {
-  PRINT("Q", Q);
-  PRINT("K", K);
-  PRINT("V", V);
-  PRINT("O", O);
-}
+    if (thread0()) {
+        PRINT("Q", Q);
+        PRINT("K", K);
+        PRINT("V", V);
+        PRINT("O", O);
+    }
 
-  auto all_gQ = local_tile(Q, make_tile(Int<kBlockM>{}, Int<kHeadDim>{}),
-                          make_coord(_, _));
+    // [d, d]
+    Tensor kv = make_tensor<T>(make_shape(Int<kHeadDim>>{}, Int<kHeadDim>>{}));
+    cute::fill(kv, 0);
 
+    for (int block_id = 0; block_id < num_block; block_id++) {
+        // [kBlockM, d]
+        auto gQ = local_tile(Q, make_tile(Int<config::kBlockM>{}, Int<config::kHeadDim>{}), make_coord(bx, _));
+        auto gK = local_tile(K, make_tile(Int<config::kBlockM>{}, Int<config::kHeadDim>{}), make_coord(bx, _));
+        auto gV = local_tile(V, make_tile(Int<config::kBlockM>{}, Int<config::kHeadDim>{}), make_coord(bx, _));
 
-  // all_gQ : gmem_ptr[16b](0x7efeff200000) o (_64,_64,2,_1):(_64,_1,_4096,_0)
-  if (thread0()) {
+        auto sQ = make_tensor(make_smem_ptr<half_t>(q_shm), config::SmemLayoutQ{});
+        auto sK = make_tensor(make_smem_ptr<half_t>(k_shm), config::SmemLayoutK{});
+        auto sV = make_tensor(make_smem_ptr<half_t>(v_shm), config::SmemLayoutV{});
 
-      PRINT("all_gQ", all_gQ);
-  }
+        // Tensor for V Transpose; used in GEMM-II.
+        auto sVt = make_tensor(make_smem_ptr<half_t>(v_shm), SmemLayoutVt{});
+        auto sVtNoSwizzle =
+            make_tensor(make_smem_ptr<half_t>(v_shm), SmemLayoutVtNoSwizzle{});
 
-
-  // gQ, gK, gV -> size kBlockM x d
-  auto gQ = local_tile(Q, make_tile(Int<kBlockM>{}, Int<kHeadDim>{}),
-                       make_coord(m_block, _));
-  auto gK = local_tile(K, make_tile(Int<kBlockN>{}, Int<kHeadDim>{}),
-                       make_coord(0, _));
-  auto gV = local_tile(V, make_tile(Int<kBlockN>{}, Int<kHeadDim>{}),
-                       make_coord(0, _));
-
-  auto sQ = make_tensor(make_smem_ptr<half_t>(q_shm), SmemLayoutQ{});
-  auto sK = make_tensor(make_smem_ptr<half_t>(k_shm), SmemLayoutK{});
-  auto sV = make_tensor(make_smem_ptr<half_t>(v_shm), SmemLayoutV{});
+        GmemTiledCopyQKV gmem_tiled_copy_QKV;
+        auto gmem_thr_copy_QKV = gmem_tiled_copy_QKV.get_thread_slice(tidx);
+        auto tQgQ = gmem_thr_copy_QKV.partition_S(gQ(_, _, 0));
+        auto tQsQ = gmem_thr_copy_QKV.partition_D(sQ);
+        auto tKgK = gmem_thr_copy_QKV.partition_S(gK(_, _, 0));
+        auto tKsK = gmem_thr_copy_QKV.partition_D(sK);
+        auto tVgV = gmem_thr_copy_QKV.partition_S(gV(_, _, 0));
+        auto tVsV = gmem_thr_copy_QKV.partition_D(sV);
+    }
 
 
- if (thread0()) {
-  PRINT("gQ", gQ);
-  PRINT("gK", gK);
-  PRINT("gV", gV);
-}
 
 
-  // Tensor for V Transpose; used in GEMM-II.
-  auto sVt = make_tensor(make_smem_ptr<half_t>(v_shm), SmemLayoutVt{});
-  auto sVtNoSwizzle =
-      make_tensor(make_smem_ptr<half_t>(v_shm), SmemLayoutVtNoSwizzle{});
-
-
-  if (thread0()) {
-  PRINT("sQ", sQ);
-  PRINT("sK", sK);
-  PRINT("sV", sV);
-  PRINT("sVt", sVt);
-  PRINT("sVtNoSwizzle", sVtNoSwizzle);
-}
-
-  GmemTiledCopyQKV gmem_tiled_copy_QKV;
-  auto gmem_thr_copy_QKV = gmem_tiled_copy_QKV.get_thread_slice(tidx);
-  auto tQgQ = gmem_thr_copy_QKV.partition_S(gQ(_, _, 0));
-  auto tQsQ = gmem_thr_copy_QKV.partition_D(sQ);
-  auto tKgK = gmem_thr_copy_QKV.partition_S(gK(_, _, 0));
-  auto tKsK = gmem_thr_copy_QKV.partition_D(sK);
-  auto tVgV = gmem_thr_copy_QKV.partition_S(gV(_, _, 0));
-  auto tVsV = gmem_thr_copy_QKV.partition_D(sV);
-
-
-  if (thread0()) {
-  PRINT("tQgQ", tQgQ);
-  PRINT("size tQgQ", size(tQgQ));
-  PRINT("tQsQ", tQsQ);
-  PRINT("size tQsQ", size(tQsQ));
-  PRINT("tKgK", tKgK);
-  PRINT("size tKgK", size(tKgK));
-  PRINT("tKsK", tKsK);
-  PRINT("size tKsK", size(tKsK));
-  PRINT("tVgV", tVgV);
-  PRINT("size tVgV", size(tVgV));
-  PRINT("tVsV", tVsV);
-  PRINT("size tVsV", size(tVsV));
-}
 
   TiledMMA tiled_mma;
   auto thr_mma = tiled_mma.get_slice(tidx);
@@ -464,122 +393,29 @@ __global__ void flash_forward(void* output, const void* q, const void* k,
 
 
 
-torch::Tensor forward_no_softmax(torch::Tensor q, torch::Tensor k, torch::Tensor v) {
-  int bs = q.size(0);
-  int head_num = q.size(1);
-  int q_len = q.size(2);
-  int head_dim = q.size(3);
-  int k_len = k.size(2);
-
-  int head_stride = q.stride(1);
+// q [B, H, N, d] k  [B, H, N, d] v [B, H, N, d] slope [H]
+torch::Tensor forward_no_softmax_with_decay(torch::Tensor q, torch::Tensor k, torch::Tensor v, torch::Tensor slope) {
+  int B = q.size(0);
+  int H = q.size(1);
+  int N = q.size(2);
+  int d = q.size(3);
 
   auto out = torch::empty_like(q);
 
-  float sm_scale = 1.0 / sqrt(head_dim);
-
-
-
-
   // only for head_dim=64
   config::FlashConfig<cute::half_t> config;
-
-  int bx = (q_len + config.kBlockM - 1) / config.kBlockM;
-  std::cout<<"q len: "<<q_len<<", bx="<<bx<<", config.kBlockM="<<config.kBlockM<<std::endl;
-
   dim3 block = config.kThreadNum;
-  dim3 grid((q_len + config.kBlockM - 1) / config.kBlockM, bs * head_num);
+  dim3 grid(B * H);
   int shm_size = config.kShmSize;
   auto partition_kernel = flash_forward<decltype(config)>;
   cudaFuncSetAttribute(partition_kernel,
                        cudaFuncAttributeMaxDynamicSharedMemorySize, shm_size);
-//  partition_kernel<<<grid, block, shm_size>>>(
-//      (void*)out.data_ptr(), (const void*)q.data_ptr(),
-//      (const void*)k.data_ptr(), (const void*)v.data_ptr(), head_stride, q_len,
-//      k_len, sm_scale);
 
   PRINT("grid", grid);
   PRINT("block", block);
 
   partition_kernel<<<grid, block, shm_size>>>(
-      (void*)out.data_ptr(), (const void*)q.data_ptr(),
-      (const void*)k.data_ptr(), (const void*)v.data_ptr(), head_stride, q_len,
-      k_len, sm_scale);
+      (const void*)q.data_ptr(),
+      (const void*)k.data_ptr(), (const void*)v.data_ptr(), (void*)out.data_ptr(), (const void*)slope.data_ptr(), B, H, N, d);
   return out;
 }
-
-
-//(base) root@autodl-container-625911aafa-78b23b76:~/cute-flash-attention/flash_attn# python3 bench.py
-//q len: 128, bx=2, config.kBlockM=64
-//grid : (2,32,1)
-//block : (128,1,1)
-//kBlockM : 64
-//kBlockN : 64
-//kHeadDim : 64
-//head_stride : 8192
-//bs_head_offset : 0
-//SmemLayoutQ : Sw<3,3,3> o _0 o ((_8,_8),(_64,_1)):((_64,_512),(_1,_0))
-//SmemLayoutK : Sw<3,3,3> o _0 o ((_8,_8),(_64,_1)):((_64,_512),(_1,_0))
-//SmemLayoutV : Sw<3,3,3> o _0 o ((_8,_8),(_64,_1)):((_64,_512),(_1,_0))
-//SmemLayoutO : Sw<3,3,3> o _0 o ((_8,_8),(_64,_1)):((_64,_512),(_1,_0))
-//SmemLayoutVt : Sw<3,3,3> o _0 o ((_64,_1),(_64,_1)):((_1,_0),(_64,_0))
-//SmemLayoutVtNoSwizzle : ((_64,_1),(_64,_1)):((_1,_0),(_64,_0))
-//size(SmemLayoutQ{}) : _4096
-//size(SmemLayoutK{}) : _4096
-//cosize(SmemLayoutQ{}) : _4096
-//cosize(SmemLayoutK{}) : _4096
-//Q : gmem_ptr[16b](0x7efeff200000) o (128,_64):(_64,_1)
-//K : gmem_ptr[16b](0x7efeff280000) o (128,_64):(_64,_1)
-//V : gmem_ptr[16b](0x7efee9e80000) o (128,_64):(_64,_1)
-//O : gmem_ptr[16b](0x7efee9f80000) o (128,_64):(_64,_1)
-//all_gQ : gmem_ptr[16b](0x7efeff200000) o (_64,_64,2,_1):(_64,_1,_4096,_0)
-//gQ : gmem_ptr[16b](0x7efeff200000) o (_64,_64,_1):(_64,_1,_0)
-//gK : gmem_ptr[16b](0x7efeff280000) o (_64,_64,_1):(_64,_1,_0)
-//gV : gmem_ptr[16b](0x7efee9e80000) o (_64,_64,_1):(_64,_1,_0)
-//sQ : smem_ptr[16b](0x7eff21000000) o Sw<3,3,3> o _0 o ((_8,_8),(_64,_1)):((_64,_512),(_1,_0))
-//sK : smem_ptr[16b](0x7eff21002000) o Sw<3,3,3> o _0 o ((_8,_8),(_64,_1)):((_64,_512),(_1,_0))
-//sV : smem_ptr[16b](0x7eff21004000) o Sw<3,3,3> o _0 o ((_8,_8),(_64,_1)):((_64,_512),(_1,_0))
-//sVt : smem_ptr[16b](0x7eff21004000) o Sw<3,3,3> o _0 o ((_64,_1),(_64,_1)):((_1,_0),(_64,_0))
-//sVtNoSwizzle : smem_ptr[16b](0x7eff21004000) o ((_64,_1),(_64,_1)):((_1,_0),(_64,_0))
-//tQgQ : gmem_ptr[16b](0x7efeff200000) o ((_8,_1),_4,_1):((_1,_0),_1024,_0)
-//size tQgQ : _32
-//tQsQ : smem_ptr[16b](0x7eff21000000) o ((_8,_1),_4,_1):((_1,_0),_1024,_0)
-//size tQsQ : _32
-//tKgK : gmem_ptr[16b](0x7efeff280000) o ((_8,_1),_4,_1):((_1,_0),_1024,_0)
-//size tKgK : _32
-//tKsK : smem_ptr[16b](0x7eff21002000) o ((_8,_1),_4,_1):((_1,_0),_1024,_0)
-//size tKsK : _32
-//tVgV : gmem_ptr[16b](0x7efee9e80000) o ((_8,_1),_4,_1):((_1,_0),_1024,_0)
-//size tVgV : _32
-//tVsV : smem_ptr[16b](0x7eff21004000) o ((_8,_1),_4,_1):((_1,_0),_1024,_0)
-//size tVsV : _32
-//tSrQ : ptr[16b](0x7eff1ffff920) o ((_2,_2,_2),_1,(_2,_2)):((_1,_2,_4),_0,(_8,_16))
-//size tSrQ : _32
-//tSrK : ptr[16b](0x7eff1ffff960) o ((_2,_2),_8,(_2,_2)):((_1,_2),_4,(_32,_64))
-//size tSrK : _128
-//tOrVt : ptr[16b](0x7eff1ffffa60) o ((_2,_2),_8,_4):((_1,_2),_4,_32)
-//size tOrVt : _128
-//rAccOut : ptr[32b](0x7eff1ffffb60) o ((_2,_2),_1,_8):((_1,_2),_0,_4)
-//rAccScore : ptr[32b](0x7eff1ffffbe0) o ((_2,_2),_1,_8):((_1,_2),_0,_4)
-//ol : ((_2,_2),_1,_8):((_1,_2),_0,_4)
-//rAccOut_new_layout : ((_2,_1),(_2,_8)):((_2,_0),(_1,_4))
-//rAccOut_new : ptr[32b](0x7eff1ffffb60) o ((_2,_1),(_2,_8)):((_2,_0),(_1,_4))
-//test_sl : ((_2,_2),_1,_8):((_1,_2),_0,_4)
-//test_rAccScore_new_layout : ((_2,_1),(_2,_8)):((_2,_0),(_1,_4))
-//test_scores : ptr[32b](0x7eff1ffffbe0) o ((_2,_1),(_2,_8)):((_2,_0),(_1,_4))
-//a: tensor([[ -8.3438, -13.0703,   0.5757,  ...,  13.6016, -10.4688,  14.6797],
-//        [ 23.2344,   7.8906,   6.2422,  ...,  -8.1641,   2.5957,   4.9570],
-//        [-12.5469,   3.2871,  -0.7871,  ...,  -2.0371,  -9.9844, -13.6953],
-//        ...,
-//        [ 27.6562, -13.8281,  -5.1406,  ...,   8.2031,  11.9219,  -9.9688],
-//        [ 21.5938,  -8.0234, -15.8828,  ..., -38.0625, -12.4609,  -3.9395],
-//        [ -3.6406,  11.4453,  -6.1094,  ...,   3.7285, -20.6875,  21.2188]],
-//       device='cuda:0', dtype=torch.float16)
-//b: tensor([[ -8.3438, -13.0703,   0.5757,  ...,  13.6016, -10.4688,  14.6797],
-//        [ 23.2344,   7.8906,   6.2422,  ...,  -8.1641,   2.5957,   4.9570],
-//        [-12.5469,   3.2871,  -0.7871,  ...,  -2.0371,  -9.9844, -13.6953],
-//        ...,
-//        [ 27.6562, -13.8281,  -5.1406,  ...,   8.2031,  11.9219,  -9.9688],
-//        [ 21.5938,  -8.0234, -15.8828,  ..., -38.0625, -12.4609,  -3.9395],
-//        [ -3.6406,  11.4453,  -6.1094,  ...,   3.7285, -20.6875,  21.2188]],
-//       device='cuda:0', dtype=torch.float16)
-//attn values sanity check: True
