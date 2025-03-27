@@ -81,7 +81,6 @@ __global__ void flash_forward(const half_t* q, const half_t* k, const half_t* v,
 
 
   const int bx = blockIdx.x;
-  const int head_id = bx % H;
   const int tx = threadIdx.x;
   const int bs_head_offset = bx * N * kHeadDim;
   const int num_block = N / BLOCK;
@@ -114,7 +113,7 @@ __global__ void flash_forward(const half_t* q, const half_t* k, const half_t* v,
     clear(tCrS);
     __syncthreads();
 
-    cute:gemm(mma, tArQ, tBrK, tCrS);
+    cute::gemm(mma, tArQ, tBrK, tCrS);
 //
 //    // 读入v 并且计算 o_intra = s @ v [BLOCK, BLOCK] @ [BLOCK, d] -> [BLOCK, d]
 //    // Tensor tArS = thr_mma.partition_fragment_A(tCrS);
