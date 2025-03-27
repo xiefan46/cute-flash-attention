@@ -111,7 +111,10 @@ __global__ void flash_forward(const half_t* q, const half_t* k, const half_t* v,
 
     Tensor tCrS = partition_fragment_C(mma, make_shape(Int<BLOCK>{}, Int<BLOCK>{})); //BLOCK x BLOCK
     clear(tCrS);
-    PRINT("tCrS", tCrS);
+    if (thread0()) {
+      PRINT("tCrS", tCrS);
+    }
+
 //    __syncthreads();
 //
 //    cute::gemm(mma, tArQ, tBrK, tCrS);
