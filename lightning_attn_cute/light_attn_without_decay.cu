@@ -148,11 +148,7 @@ torch::Tensor forward_without_decay(torch::Tensor q, torch::Tensor k, torch::Ten
   config::FlashConfig<cute::half_t> config;
   dim3 block = config.kThreadNum;
   dim3 grid(B * H);
-  int shm_size = config.kShmSize;
   auto partition_kernel = flash_forward<decltype(config)>;
-  cudaFuncSetAttribute(partition_kernel,
-                       cudaFuncAttributeMaxDynamicSharedMemorySize, shm_size);
-
   PRINT("grid", grid);
   PRINT("block", block);
 
