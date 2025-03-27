@@ -124,16 +124,16 @@ __global__ void flash_forward(const half_t* q, const half_t* k, const half_t* v,
     clear(tCrS);
     if (thread0()) {
       PRINT("tCrS", tCrS);
-      PRINT_TENSOR("tCrS", tCrS)
+      // PRINT_TENSOR("tCrS", tCrS)
     }
 
 	__syncthreads();
 
     cute::gemm(mma, tArQ, tBrK, tCrS);
 
-    if (thread0()) {
-      PRINT_TENSOR("tCrS", tCrS);
-    }
+//    if (thread0()) {
+//      PRINT_TENSOR("tCrS", tCrS);
+//    }
 
     // 读入v 并且计算 o_intra = s @ v [BLOCK, BLOCK] @ [BLOCK, d] -> [BLOCK, d]
     // Tensor tArS = thr_mma.partition_fragment_A(tCrS);
@@ -141,12 +141,12 @@ __global__ void flash_forward(const half_t* q, const half_t* k, const half_t* v,
     // Tensor tArS = thr_mma.partition_A(tCrS);
     // cute::copy(tCrS, tArS);
     Tensor tArS = thr_mma.partition_A(make_tensor(tCrS.data(), make_shape(Int<BLOCK>{}, Int<BLOCK>{})));
-    tArS(0) = 0;
     if (thread0()) {
       // PRINT_TENSOR("tCrS after partition fragment", tCrS);
       // PRINT_TENSOR("tArS after partition fragment", tArS);
-      PRINT_TENSOR("tCrS", tCrS);
+      // PRINT_TENSOR("tCrS", tCrS);
       // PRINT_TENSOR("tArS", tArS);
+      PRINT(tArS);
     }
 
 //	Tensor tBgVt = thr_mma.partition_B(gVt);
