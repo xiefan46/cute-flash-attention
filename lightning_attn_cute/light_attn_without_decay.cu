@@ -122,18 +122,18 @@ __global__ void flash_forward(const half_t* q, const half_t* k, const half_t* v,
 
     Tensor tCrS = partition_fragment_C(mma, make_shape(Int<BLOCK>{}, Int<BLOCK>{})); //BLOCK x BLOCK
     clear(tCrS);
-//    if (thread0()) {
-//      PRINT("tCrS", tCrS);
-//      PRINT_TENSOR("tCrS", tCrS)
-//    }
+    if (thread0()) {
+      PRINT("tCrS", tCrS);
+      PRINT_TENSOR("tCrS", tCrS)
+    }
 
 	__syncthreads();
 
     cute::gemm(mma, tArQ, tBrK, tCrS);
 
-//    if (thread0()) {
-//      PRINT_TENSOR("tCrS", tCrS);
-//    }
+    if (thread0()) {
+      PRINT_TENSOR("tCrS", tCrS);
+    }
 
     // 读入v 并且计算 o_intra = s @ v [BLOCK, BLOCK] @ [BLOCK, d] -> [BLOCK, d]
     // Tensor tArS = thr_mma.partition_fragment_A(tCrS);
@@ -184,6 +184,5 @@ torch::Tensor forward_without_decay(torch::Tensor q, torch::Tensor k, torch::Ten
 
   partition_kernel<<<grid, block>>>((cute::half_t*)q.data_ptr(), (cute::half_t*)k.data_ptr(),
                                               (cute::half_t*)v.data_ptr(), (cute::half_t*)out.data_ptr(), B, H, N);
-  cudaDeviceSynchronize();
   return out;
 }
