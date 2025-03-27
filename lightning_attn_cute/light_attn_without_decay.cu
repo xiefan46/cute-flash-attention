@@ -13,6 +13,12 @@ using namespace cute;
     print(content);          \
     print("\n");
 
+#define PRINT_TENSOR(name, content) \
+    print(name);             \
+    print(" : ");            \
+    print_tensor(content);          \
+    print("\n");
+
 
 namespace config {
 using namespace cute;
@@ -117,7 +123,7 @@ __global__ void flash_forward(const half_t* q, const half_t* k, const half_t* v,
     clear(tCrS);
     if (thread0()) {
       PRINT("tCrS", tCrS);
-      cute::print_tensor(tCrS);
+      PRINT_TENSOR("tCrS", tCrS)
     }
 
 	__syncthreads();
@@ -125,14 +131,19 @@ __global__ void flash_forward(const half_t* q, const half_t* k, const half_t* v,
     cute::gemm(mma, tArQ, tBrK, tCrS);
 
     if (thread0()) {
-      cute::print_tensor(tCrS);
+      PRINT_TENSOR("tCrS", tCrS);
     }
-//
-//    // 读入v 并且计算 o_intra = s @ v [BLOCK, BLOCK] @ [BLOCK, d] -> [BLOCK, d]
-//    // Tensor tArS = thr_mma.partition_fragment_A(tCrS);
-//    Tensor tArS = thr_mma.partition_fragment_A(make_shape(Int<BLOCK>{}, Int<BLOCK>{}));
-//    cute::copy(tCrS, tArS);
-//
+
+    // 读入v 并且计算 o_intra = s @ v [BLOCK, BLOCK] @ [BLOCK, d] -> [BLOCK, d]
+    Tensor tArS = thr_mma.partition_fragment_A(tCrS);
+    // Tensor tArS = thr_mma.partition_fragment_A(make_shape(Int<BLOCK>{}, Int<BLOCK>{}));
+    cute::copy(tCrS, tArS);
+    tArS(0) = 0;
+    if (thread0()) {
+      PRINT_TENSOR("tCrS", tCrS);
+      PRINT_TENSOR("tArS", tArS);
+    }
+
 //	Tensor tBgVt = thr_mma.partition_B(gVt);
 //    Tensor tBrVt = thr_mma.partition_fragment_B(gVt);
 //    Tensor tCrO_intra = thr_mma.partition_fragment_C(make_shape(Int<BLOCK>{}, Int<kHeadDim>{})); //BLOCK x d
