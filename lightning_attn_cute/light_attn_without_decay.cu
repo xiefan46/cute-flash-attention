@@ -145,8 +145,8 @@ __global__ void flash_forward(const half_t* q, const half_t* k, const half_t* v,
     if (thread0()) {
       // PRINT_TENSOR("tCrS after partition fragment", tCrS);
       // PRINT_TENSOR("tArS after partition fragment", tArS);
-      // PRINT_TENSOR("tCrS", tCrS);
-      PRINT_TENSOR("tArS", tArS);
+      PRINT_TENSOR("tCrS", tCrS);
+      // PRINT_TENSOR("tArS", tArS);
     }
 
 //	Tensor tBgVt = thr_mma.partition_B(gVt);
