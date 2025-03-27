@@ -136,8 +136,8 @@ __global__ void flash_forward(const half_t* q, const half_t* k, const half_t* v,
     }
 
     // 读入v 并且计算 o_intra = s @ v [BLOCK, BLOCK] @ [BLOCK, d] -> [BLOCK, d]
-    Tensor tArS = thr_mma.partition_fragment_A(tCrS);
-    // Tensor tArS = thr_mma.partition_fragment_A(make_shape(Int<BLOCK>{}, Int<BLOCK>{}));
+    // Tensor tArS = thr_mma.partition_fragment_A(tCrS);
+    Tensor tArS = thr_mma.partition_fragment_A(make_shape(Int<BLOCK>{}, Int<BLOCK>{}));
     cute::copy(tCrS, tArS);
     tArS(0) = 0;
     if (thread0()) {
