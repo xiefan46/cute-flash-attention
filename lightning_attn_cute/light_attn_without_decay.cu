@@ -33,13 +33,13 @@ struct FlashConfig {
   using mma_op = SM80_16x8x16_F32F16F16F32_TN;
   using mma_traits = MMA_Traits<mma_op>;
   using mma_atom = MMA_Atom<mma_traits>;
-  static constexpr int kMmaEURepeatM = 1;
+  static constexpr int kMmaEURepeatM = 1; // 4 -> 1
   static constexpr int kMmaEURepeatN = 1;
   static constexpr int kMmaEURepeatK = 1;
 
   using mma_atom_shape = mma_traits::Shape_MNK;
   static constexpr int kMmaPM = 1 * kMmaEURepeatM * get<0>(mma_atom_shape{});
-  static constexpr int kMmaPN = 1 * kMmaEURepeatN * get<1>(mma_atom_shape{});
+  static constexpr int kMmaPN = 1 * kMmaEURepeatN * get<1>(mma_atom_shape{}); // 2 -> 1
   static constexpr int kMmaPK = 1 * kMmaEURepeatK * get<2>(mma_atom_shape{});
 
   using MMA_EU_RepeatT = decltype(make_layout(make_shape(
@@ -89,7 +89,8 @@ __global__ void flash_forward(const half_t* q, const half_t* k, const half_t* v,
   const int bx = blockIdx.x;
   const int tx = threadIdx.x;
   const int bs_head_offset = bx * N * kHeadDim;
-  const int num_block = N / BLOCK;
+  // const int num_block = N / BLOCK;
+  const int num_block = 1;
 
 
   Tensor Q = make_tensor(make_gmem_ptr<half_t>(q + bs_head_offset), make_shape(N, Int<kHeadDim>{}), make_stride(Int<kHeadDim>{}, Int<1>{})); // N x d
