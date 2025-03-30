@@ -106,8 +106,8 @@ __global__ void flash_forward(const half_t* q, const half_t* k, const half_t* v,
   // const int num_block = N / BLOCK;
   const int num_block = 1;
 
-  __shared__ half_t smem_S[BLOCK][BLOCK];
-  __shared__ half_t smem_KV[kHeadDim][kHeadDim]; // dxd
+  __shared__ half_t smem_S[BLOCK * BLOCK];
+  __shared__ half_t smem_KV[kHeadDim * kHeadDim]; // dxd
 
 
   Tensor Q = make_tensor(make_gmem_ptr<half_t>(q + bs_head_offset), make_shape(N, Int<kHeadDim>{}), make_stride(Int<kHeadDim>{}, Int<1>{})); // N x d
@@ -118,8 +118,8 @@ __global__ void flash_forward(const half_t* q, const half_t* k, const half_t* v,
 
   
   // shared memory tensors
-  Tensor sS = make_tensor(make_smem_ptr(&smem_S), make_shape(Int<BLOCK>{}, Int<BLOCK>{}), make_stride(Int<BLOCK>{}, Int<1>{}));
-  Tensor sKV = make_tensor(make_smem_ptr(&smem_KV), make_shape(Int<kHeadDim>{}, Int<kHeadDim>{}),
+  Tensor sS = make_tensor(make_smem_ptr(smem_S[0]), make_shape(Int<BLOCK>{}, Int<BLOCK>{}), make_stride(Int<BLOCK>{}, Int<1>{}));
+  Tensor sKV = make_tensor(make_smem_ptr(smem_KV[0]), make_shape(Int<kHeadDim>{}, Int<kHeadDim>{}),
                              make_stride(Int<kHeadDim>{}, Int<1>{}));
 
   TiledMMA mma;
@@ -148,10 +148,6 @@ __global__ void flash_forward(const half_t* q, const half_t* k, const half_t* v,
 
     Tensor tCrS = partition_fragment_C(mma, make_shape(Int<BLOCK>{}, Int<BLOCK>{})); //BLOCK x BLOCK
     clear(tCrS);
-    if (thread0()) {
-      PRINT("tCrS", tCrS);
-      // PRINT_TENSOR("tCrS", tCrS)
-    }
 
 	  __syncthreads();
 
