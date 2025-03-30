@@ -145,54 +145,54 @@ __global__ void flash_forward(const half_t* q, const half_t* k, const half_t* v,
 
 
     // 将S矩阵寄存器中的结果写入到shared memroy, 并且自动将fp32转化为fp16
-    Tensor tCsS = thr_mma.partition_C(sS);
-    cute::copy(tCrS, tCsS);
-    __syncthreads();
-
-    // 以A的layout读入S矩阵并且与Vt进行第二个gemm的计算
-    Tensor tAsS = thr_mma.partition_A(sS);
-    Tensor tArS = thr_mma.partition_fragment_A(sS);
-    cute::copy(tAsS, tArS);
-
-	  Tensor tBgVt = thr_mma.partition_B(gVt);
-    Tensor tBrVt = thr_mma.partition_fragment_B(gVt);
-    cute::copy(tBgVt, tBrVt);
-
-    Tensor tCrO_intra = thr_mma.partition_fragment_C(make_shape(Int<BLOCK>{}, Int<kHeadDim>{})); //BLOCK x d
-    cute::clear(tCrO_intra);
-    cute::gemm(tArS, tBrVt, tCrO_intra);
-
-
-    // 计算 o_inter = q @ kv -> BLOCK x d @ d x d = BLOCK x d
-
-    Tensor tBsKV = thr_mma.partition_B(sKV);
-    Tensor tBrKV = thr_mma.partition_fragment(sKV);
-    cute::copy(tBsKV, tBrKV);
-    Tensor tCrO_inter = thr_mma.partition_fragment_C(make_shape(Int<BLOCK>{}, Int<kHeadDim>{}));
-    cute::clear(tCrO_inter);
-    cute::gemm(tArQ, tBrKV, tCrO_inter);
-
-    // O = O_intra + O_inter
-    cute::axpby(1.0, tCrO_intra, 1.0, tCrO_inter);
-
-    // write O to global memory
-    Tensor tCgO = thr_mma.partition_C(gO);
-    cute::copy(tCrO_inter, tCgO);
-    __syncthreads();
-
-    // Update KV
-    // new_kv = tl.dot(k_t, v) d x BLOCK @ d x BLOCK = d x  d
-    // kv = kv * block_decay + new_kv, block_decay = 1.0
-    Tensor tAgKt = thr_mma.partition_A(gKt);
-    Tensor tArKt = thr_mma.partition_fragment_A(gKt);
-    cute::copy(tAgKt, tArKt);
-
-    Tensor tCrNewKV = thr_mma.partition_fragment_C(make_shape(Int<kHeadDim>{}, Int<kHeadDim>{}));
-    clear(tCrNewKV);
-    cute::gemm(tArKt, tBrVt, tCrNewKV);
-    Tensor tCsKV = thr_mma.partition_C(sKV);
-
-    cute::axpby(1.0, tCrNewKV, 1.0, tCsKV);
+//    Tensor tCsS = thr_mma.partition_C(sS);
+//    cute::copy(tCrS, tCsS);
+//    __syncthreads();
+//
+//    // 以A的layout读入S矩阵并且与Vt进行第二个gemm的计算
+//    Tensor tAsS = thr_mma.partition_A(sS);
+//    Tensor tArS = thr_mma.partition_fragment_A(sS);
+//    cute::copy(tAsS, tArS);
+//
+//	  Tensor tBgVt = thr_mma.partition_B(gVt);
+//    Tensor tBrVt = thr_mma.partition_fragment_B(gVt);
+//    cute::copy(tBgVt, tBrVt);
+//
+//    Tensor tCrO_intra = thr_mma.partition_fragment_C(make_shape(Int<BLOCK>{}, Int<kHeadDim>{})); //BLOCK x d
+//    cute::clear(tCrO_intra);
+//    cute::gemm(tArS, tBrVt, tCrO_intra);
+//
+//
+//    // 计算 o_inter = q @ kv -> BLOCK x d @ d x d = BLOCK x d
+//
+//    Tensor tBsKV = thr_mma.partition_B(sKV);
+//    Tensor tBrKV = thr_mma.partition_fragment(sKV);
+//    cute::copy(tBsKV, tBrKV);
+//    Tensor tCrO_inter = thr_mma.partition_fragment_C(make_shape(Int<BLOCK>{}, Int<kHeadDim>{}));
+//    cute::clear(tCrO_inter);
+//    cute::gemm(tArQ, tBrKV, tCrO_inter);
+//
+//    // O = O_intra + O_inter
+//    cute::axpby(1.0, tCrO_intra, 1.0, tCrO_inter);
+//
+//    // write O to global memory
+//    Tensor tCgO = thr_mma.partition_C(gO);
+//    cute::copy(tCrO_inter, tCgO);
+//    __syncthreads();
+//
+//    // Update KV
+//    // new_kv = tl.dot(k_t, v) d x BLOCK @ d x BLOCK = d x  d
+//    // kv = kv * block_decay + new_kv, block_decay = 1.0
+//    Tensor tAgKt = thr_mma.partition_A(gKt);
+//    Tensor tArKt = thr_mma.partition_fragment_A(gKt);
+//    cute::copy(tAgKt, tArKt);
+//
+//    Tensor tCrNewKV = thr_mma.partition_fragment_C(make_shape(Int<kHeadDim>{}, Int<kHeadDim>{}));
+//    clear(tCrNewKV);
+//    cute::gemm(tArKt, tBrVt, tCrNewKV);
+//    Tensor tCsKV = thr_mma.partition_C(sKV);
+//
+//    cute::axpby(1.0, tCrNewKV, 1.0, tCsKV);
   }
 
 }
