@@ -132,7 +132,7 @@ __global__ void flash_forward(const half_t* q, const half_t* k, const half_t* v,
     cute::copy(tAgQ, tArQ);
     cute::copy(tBgK, tBrK);
 
-    Tensor tCrS = thr_mma.partition_fragment_C(make_shape(Int<BLOCK>{}, Int<BLOCK>{})); //BLOCK x BLOCK
+    Tensor tCrS = thr_mma.partition_fragment_C(make_tensor(make_shape(Int<BLOCK>{}, Int<BLOCK>{}))); //BLOCK x BLOCK
     clear(tCrS);
     if (thread0()) {
       PRINT("tCrS", tCrS);
