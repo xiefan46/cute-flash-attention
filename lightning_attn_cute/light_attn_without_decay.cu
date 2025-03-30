@@ -129,6 +129,9 @@ __global__ void flash_forward(const half_t* q, const half_t* k, const half_t* v,
     PRINT("mma size", size(mma));
   }
 
+
+  auto tmp_a = make_layout(make_shape(Int<BLOCK>{}, Int<BLOCK>{}));
+
   for (int block_id = 0; block_id < num_block; block_id++) {
     Tensor gQ = local_tile(Q, make_tile(Int<BLOCK>{}, Int<kHeadDim>{}), make_coord(block_id, 0)); //BLOCK x d
     Tensor gK = local_tile(K, make_tile(Int<BLOCK>{}, Int<kHeadDim>{}), make_coord(block_id, 0)); //BLOCK x d
@@ -159,6 +162,7 @@ __global__ void flash_forward(const half_t* q, const half_t* k, const half_t* v,
     Tensor tCrS_f16 = convert_type<half_t>(tCrS);
 
     if (thread0()) {
+      PRINT("tmp_a", tmp_a);
       PRINT("sS", sS);
       PRINT("sKV", sKV);
       PRINT("tAgQ", tAgQ);
