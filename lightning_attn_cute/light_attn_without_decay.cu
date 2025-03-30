@@ -4,6 +4,10 @@
 #include <torch/types.h>
 
 #include <cute/tensor.hpp>
+#include <cutlass/array.h>
+#include <cutlass/cutlass.h>
+#include <cutlass/numeric_conversion.h>
+#include <cutlass/numeric_types.h>
 
 using namespace cute;
 
