@@ -178,7 +178,7 @@ __global__ void flash_forward(const half_t* q, const half_t* k, const half_t* v,
       // PRINT_TENSOR("tArQ tensor", tArQ);
       PRINT_TENSOR("tCrS tensor", tCrS((1, 1), 3, _));
     }
-    ensor tCrS_f16 = convert_type<half_t>(tCrS);
+    Tensor tCrS_f16 = convert_type<half_t>(tCrS);
      cute::copy(tCrS_f16, tCsS);
      __syncthreads();
 //
