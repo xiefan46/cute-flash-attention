@@ -172,7 +172,6 @@ __global__ void flash_forward(const half_t* q, const half_t* k, const half_t* v,
       PRINT("tBrK", tBrK);
       PRINT("tCsS", tCsS);
       PRINT("tCrS", tCrS);
-      PRINT("tCrS_f16", tCrS_f16);
     }
 
     if (thread0()) {
