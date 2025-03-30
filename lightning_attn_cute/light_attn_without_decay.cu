@@ -118,8 +118,8 @@ __global__ void flash_forward(const half_t* q, const half_t* k, const half_t* v,
 
   
   // shared memory tensors
-  Tensor sS = make_tensor(make_smem_ptr(&smem_S), make_shape(Int<BLOCK>{}, Int<BLOCK>{}), make_stride(Int<BLOCK>{}, Int<1>{}));
-  Tensor sKV = make_tensor(make_smem_ptr(&smem_KV), make_shape(Int<kHeadDim>{}, Int<kHeadDim>{}),
+  Tensor sS = make_tensor(make_smem_ptr<half_t>(&smem_S), make_shape(Int<BLOCK>{}, Int<BLOCK>{}), make_stride(Int<BLOCK>{}, Int<1>{}));
+  Tensor sKV = make_tensor(make_smem_ptr<half_t>(&smem_KV), make_shape(Int<kHeadDim>{}, Int<kHeadDim>{}),
                              make_stride(Int<kHeadDim>{}, Int<1>{}));
 
   TiledMMA mma;
