@@ -146,7 +146,9 @@ __global__ void flash_forward(const half_t* q, const half_t* k, const half_t* v,
 
     // 将S矩阵寄存器中的结果写入到shared memroy
     Tensor tCsS = thr_mma.partition_C(sS);
-    cute::copy(tCrS, tCsS, cute::Convert<half_t>{});
+//    cute::copy(tCrS, tCsS, cute::Convert<half_t>{});
+    auto f_convert = [](float x) { return __float2half(x); };
+    cute::transform(tCrS, tCsS, f_convert);
     __syncthreads();
 //
 //    // 以A的layout读入S矩阵并且与Vt进行第二个gemm的计算
