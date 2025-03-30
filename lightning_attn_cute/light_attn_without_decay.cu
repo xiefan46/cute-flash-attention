@@ -146,21 +146,22 @@ __global__ void flash_forward(const half_t* q, const half_t* k, const half_t* v,
     Tensor tBgK = thr_mma.partition_B(gK);
     Tensor tBrK = thr_mma.partition_fragment_B(gK);
 
+    Tensor tCsS = thr_mma.partition_C(sS);
+
+
     cute::copy(tAgQ, tArQ);
     cute::copy(tBgK, tBrK);
 
     // Tensor tCrS = partition_fragment_C(mma, make_shape(Int<BLOCK>{}, Int<BLOCK>{})); //BLOCK x BLOCK
-    Tensor tCrS = thr_mma.make_fragment_C(make_shape(Int<BLOCK>{}, Int<BLOCK>{}));
+    Tensor tCrS = thr_mma.make_fragment_C(tCsS);
     clear(tCrS);
 
-	  __syncthreads();
+	__syncthreads();
 
     cute::gemm(mma, tArQ, tBrK, tCrS);
 
 
     // 将S矩阵寄存器中的结果写入到shared memroy
-    Tensor tCsS = thr_mma.partition_C(sS);
-    Tensor tCrS_f16 = convert_type<half_t>(tCrS);
 
     if (thread0()) {
       PRINT("tmp_a", tmp_a);
@@ -178,7 +179,7 @@ __global__ void flash_forward(const half_t* q, const half_t* k, const half_t* v,
       // PRINT_TENSOR("tArQ tensor", tArQ);
       PRINT_TENSOR("tCrS tensor", tCrS((1, 1), 3, _));
     }
-
+    ensor tCrS_f16 = convert_type<half_t>(tCrS);
      cute::copy(tCrS_f16, tCsS);
      __syncthreads();
 //
