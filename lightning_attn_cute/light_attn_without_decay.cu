@@ -164,8 +164,8 @@ __global__ void flash_forward(const half_t* q, const half_t* k, const half_t* v,
       PRINT("tCrS_f16", tCrS_f16);
     }
 
-    // cute::copy(tCrS_f16, tCsS);
-    // __syncthreads();
+     cute::copy(tCrS_f16, tCsS);
+     __syncthreads();
 //
 //    // 以A的layout读入S矩阵并且与Vt进行第二个gemm的计算
 //    Tensor tAsS = thr_mma.partition_A(sS);
