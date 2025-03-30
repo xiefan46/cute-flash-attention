@@ -161,6 +161,13 @@ __global__ void flash_forward(const half_t* q, const half_t* k, const half_t* v,
     // 将S矩阵寄存器中的结果写入到shared memroy
     Tensor tCsS = thr_mma.partition_C(sS);
     Tensor tCrS_f16 = convert_type<half_t>(tCrS);
+
+    if (thread0()) {
+      PRINT("tCsS", tCsS);
+      PRINT("tCrS", tCrS);
+      PRINT("tCrS_f16", tCrS_f16);
+    }
+
     cute::copy(tCrS_f16, tCsS);
     __syncthreads();
 //
