@@ -168,7 +168,8 @@ __global__ void flash_forward(const half_t* q, const half_t* k, const half_t* v,
     }
 
     if (thread0()) {
-      PRINT_TENSOR("tArQ", tArQ);
+      PRINT_TENSOR("tArQ tensor", tArQ);
+      PRINT("tCrS_f16 tensor", tCrS_f16);
     }
 
      cute::copy(tCrS_f16, tCsS);
