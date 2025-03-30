@@ -150,11 +150,11 @@ __global__ void flash_forward(const half_t* q, const half_t* k, const half_t* v,
     __syncthreads();
 
     // 以A的layout读入S矩阵并且与Vt进行第二个gemm的计算
-    Tensor tAsS = thr_mma.partition_A(S);
-    Tensor tArS = thr_mma.partition_fragment_A(S);
+    Tensor tAsS = thr_mma.partition_A(sS);
+    Tensor tArS = thr_mma.partition_fragment_A(sS);
     cute::copy(tAsS, tArS);
 
-	Tensor tBgVt = thr_mma.partition_B(gVt);
+	  Tensor tBgVt = thr_mma.partition_B(gVt);
     Tensor tBrVt = thr_mma.partition_fragment_B(gVt);
     cute::copy(tBgVt, tBrVt);
 
@@ -169,7 +169,7 @@ __global__ void flash_forward(const half_t* q, const half_t* k, const half_t* v,
     Tensor tBrKV = thr_mma.partition_fragment(sKV);
     cute::copy(tBsKV, tBrKV);
     Tensor tCrO_inter = thr_mma.partition_fragment_C(make_shape(Int<BLOCK>{}, Int<kHeadDim>{}));
-    cute::clear(tCsO_inter);
+    cute::clear(tCrO_inter);
     cute::gemm(tArQ, tBrKV, tCrO_inter);
 
     // O = O_intra + O_inter
