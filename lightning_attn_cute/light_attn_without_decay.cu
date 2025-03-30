@@ -159,6 +159,8 @@ __global__ void flash_forward(const half_t* q, const half_t* k, const half_t* v,
     Tensor tCrS_f16 = convert_type<half_t>(tCrS);
 
     if (thread0()) {
+      PRINT("sS", sS);
+      PRINT("sKV", sKV);
       PRINT("tAgQ", tAgQ);
       PRINT("tArQ", tArQ);
       PRINT("tBrK", tBrK);
