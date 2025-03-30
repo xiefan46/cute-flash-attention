@@ -71,6 +71,16 @@ struct FlashConfig {
 //        block_off += BLOCK
 
 
+template <typename To_type, typename Engine, typename Layout>
+__forceinline__ __device__ auto convert_type(Tensor<Engine, Layout> const &tensor) {
+    using From_type = typename Engine::value_type;
+    constexpr int numel = decltype(size(tensor))::value;
+    cutlass::NumericArrayConverter<To_type, From_type, numel> convert_op;
+    // HACK: this requires tensor to be "contiguous"
+    auto frag = convert_op(*reinterpret_cast<const cutlass::Array<From_type, numel> *>(tensor.data()));
+    return make_tensor(make_rmem_ptr<To_type>(&frag), tensor.layout());
+}
+
 // TODO:
 // 1. smem要怎么处理才能避免相互覆盖的问题
 // 2. smem如何处理多stage
@@ -146,9 +156,8 @@ __global__ void flash_forward(const half_t* q, const half_t* k, const half_t* v,
 
     // 将S矩阵寄存器中的结果写入到shared memroy
     Tensor tCsS = thr_mma.partition_C(sS);
-//    cute::copy(tCrS, tCsS, cute::Convert<half_t>{});
-    auto f_convert = [](float x) { return __float2half(x); };
-    cute::transform(tCrS, tCsS, f_convert);
+    Tensor tCrS_f16 = convert_type<half_t>(tCrS);
+    cute::copy(tCrS_f16, tCsS);
     __syncthreads();
 //
 //    // 以A的layout读入S矩阵并且与Vt进行第二个gemm的计算
