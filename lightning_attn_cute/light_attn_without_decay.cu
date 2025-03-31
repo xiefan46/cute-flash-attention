@@ -227,6 +227,10 @@ __global__ void flash_forward(const half_t* q, const half_t* k, const half_t* v,
 
     auto tBrKV_fp16 = fp32_to_fp16(tCrKV);
 
+    if (thread0()) {
+      PRINT("tBrKV_fp16", tBrKV_fp16);
+    }
+
 //    cute::gemm(mma, tArQ, tBrKV_fp16, tCrO_inter);
 //
 //    if (thread0()) {
