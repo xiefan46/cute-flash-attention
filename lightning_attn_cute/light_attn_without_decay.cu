@@ -141,8 +141,6 @@ __global__ void flash_forward(const half_t* q, const half_t* k, const half_t* v,
     Tensor tArQ = thr_mma.partition_fragment_A(gQ);
     Tensor tBgK = thr_mma.partition_B(gK);
     Tensor tBrK = thr_mma.partition_fragment_B(gK);
-
-
     cute::copy(tAgQ, tArQ);
     cute::copy(tBgK, tBrK);
 
@@ -153,8 +151,6 @@ __global__ void flash_forward(const half_t* q, const half_t* k, const half_t* v,
     cute::gemm(mma, tArQ, tBrK, tCrS);
 
 
-    // 将S矩阵寄存器中的结果写入到shared memroy
-
 //    if (thread0()) {
 //      PRINT("tAgQ", tAgQ);
 //      PRINT("tArQ", tArQ);
@@ -162,13 +158,11 @@ __global__ void flash_forward(const half_t* q, const half_t* k, const half_t* v,
 //      PRINT("tCrS", tCrS);
 //    }
 //
-//    if (thread0()) {
-//      // PRINT_TENSOR("tArQ tensor", tArQ);
-//      PRINT_TENSOR("tCrS tensor", tCrS((1, 1), 3, _));
-//    }
-//    Tensor tCrS_f16 = convert_type<half_t>(tCrS);
-//    cute::copy(tCrS_f16, tCsS);
-//    __syncthreads();
+    if (thread0()) {
+      // PRINT_TENSOR("tArQ tensor", tArQ);
+      PRINT_TENSOR("tCrS tensor", tCrS);
+    }
+    Tensor tCrS_f16 = convert_type<half_t>(tCrS);
 //
 //    // 以A的layout读入S矩阵并且与Vt进行第二个gemm的计算
 //    Tensor tAsS = thr_mma.partition_A(sS);
