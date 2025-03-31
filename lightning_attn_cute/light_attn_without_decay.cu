@@ -222,7 +222,7 @@ __global__ void flash_forward(const half_t* q, const half_t* k, const half_t* v,
 
     // 计算 o_inter = q @ kv -> BLOCK x d @ d x d = BLOCK x d
 
-    Tensor tCrO_inter = thr_mma.partition_fragment_C(make_shape(Int<BLOCK>{}, Int<kHeadDim>{}));
+    Tensor tCrO_inter = partition_fragment_C(mma, make_shape(Int<BLOCK>{}, Int<kHeadDim>{}));
     cute::clear(tCrO_inter);
 
     auto tBrKV_fp16 = fp32_to_fp16(tCrKV);
