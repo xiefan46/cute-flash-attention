@@ -193,7 +193,7 @@ __global__ void flash_forward(const half_t* q, const half_t* k, const half_t* v,
     Tensor tOrS = make_tensor(tCrS_fp16.data(), tOrS_laytout);
     if (thread0()) {
       PRINT("tOrS", tOrS);
-      PRINT_TENSOR("tOrS tensor", tOrS);
+      // PRINT_TENSOR("tOrS tensor", tOrS);
     }
 
 
@@ -227,7 +227,7 @@ __global__ void flash_forward(const half_t* q, const half_t* k, const half_t* v,
 
     auto tBrKV_fp16 = fp32_to_fp16(tCrKV);
 
-    cute::gemm(tArQ, tBrKV_fp16, tCrO_inter);
+    cute::gemm(mma, tArQ, tBrKV_fp16, tCrO_inter);
 
     if (thread0()) {
       PRINT_TENSOR("tCrO_inter", tCrO_inter);
