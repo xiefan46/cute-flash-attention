@@ -228,7 +228,7 @@ __global__ void flash_forward(const half_t* q, const half_t* k, const half_t* v,
     auto tCrKV_fp16 = fp32_to_fp16(tCrKV);
 
     if (thread0()) {
-      PRINT("tBrKV_fp16", tBrKV_fp16);
+      PRINT("tCrKV_fp16", tCrKV_fp16);
     }
 
     auto l2 = tCrKV_fp16.layout();
