@@ -277,7 +277,7 @@ __global__ void flash_forward(const half_t* q, const half_t* k, const half_t* v,
       PRINT("tCrNewKV", tCrNewKV);
     }
 
-    cute::gemm(tArKt, tBrVt, tCrNewKV);
+    cute::gemm(mma, tArKt, tBrVt, tCrNewKV);
 
 //    cute::axpby(1.0, tCrNewKV, 1.0, tCrKV);
 //
