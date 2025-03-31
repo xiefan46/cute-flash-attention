@@ -262,7 +262,11 @@ __global__ void flash_forward(const half_t* q, const half_t* k, const half_t* v,
     // kv = kv * block_decay + new_kv, block_decay = 1.0
     Tensor tAgKt = thr_mma.partition_A(gKt);
     Tensor tArKt = thr_mma.partition_fragment_A(gKt);
+    Temsor tBgVt = thr_mma.partition_B(gVt);
+    Tensor tBrVt = thr_mma.partition_fragment_B(gVt);
+
     cute::copy(tAgKt, tArKt);
+    cute::copy(tBgVt, tBrVt);
 
     Tensor tCrNewKV = thr_mma.partition_fragment_C(make_shape(Int<kHeadDim>{}, Int<kHeadDim>{}));
     clear(tCrNewKV);
