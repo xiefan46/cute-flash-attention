@@ -191,10 +191,10 @@ __global__ void flash_forward(const half_t* q, const half_t* k, const half_t* v,
       PRINT("tOrS_laytout", tOrS_laytout);
     }
     Tensor tOrS = make_tensor(tCrS_fp16.data(), tOrS_laytout);
-//    if (thread0()) {
-//      PRINT("tOrS", tOrS);
-//      PRINT_TENSOR("tOrS tensor", tOrS);
-//    }
+    if (thread0()) {
+      PRINT("tOrS", tOrS);
+      PRINT_TENSOR("tOrS tensor", tOrS);
+    }
 
 
 	  Tensor tOgVt = thr_mma.partition_B(gVt);
