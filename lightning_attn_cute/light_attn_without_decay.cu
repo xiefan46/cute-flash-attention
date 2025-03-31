@@ -209,7 +209,7 @@ __global__ void flash_forward(const half_t* q, const half_t* k, const half_t* v,
     cute::clear(tOrO_intra);
 
     if (thread0()) {
-      PRINT("tOrO_intra", tOrO_intra);
+      PRINT_TENSOR("tOrO_intra", tOrO_intra);
     }
 
 
@@ -236,12 +236,14 @@ __global__ void flash_forward(const half_t* q, const half_t* k, const half_t* v,
 
     cute::gemm(mma, tArQ, tBrKV_fp16, tCrO_inter);
 
+
+
+    // O = O_intra + O_inter
+    cute::axpby(1.0, tCrO_intra, 1.0, tCrO_inter);
     if (thread0()) {
       PRINT_TENSOR("tCrO_inter", tCrO_inter);
     }
-//
-//    // O = O_intra + O_inter
-//    cute::axpby(1.0, tCrO_intra, 1.0, tCrO_inter);
+
 //
 //    // write O to global memory
 //    Tensor tCgO = thr_mma.partition_C(gO);
