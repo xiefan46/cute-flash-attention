@@ -231,7 +231,7 @@ __global__ void flash_forward(const half_t* q, const half_t* k, const half_t* v,
       PRINT("tBrKV_fp16", tBrKV_fp16);
     }
 
-//    cute::gemm(mma, tArQ, tBrKV_fp16, tCrO_inter);
+    cute::gemm(mma, tArQ, tBrKV_fp16, tCrO_inter);
 //
 //    if (thread0()) {
 //      PRINT_TENSOR("tCrO_inter", tCrO_inter);
