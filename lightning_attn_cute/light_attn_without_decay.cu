@@ -213,9 +213,9 @@ __global__ void flash_forward(const half_t* q, const half_t* k, const half_t* v,
 
     cute::gemm(mma, tOrS, tOrVt, tOrO_intra);
 
-    if (thread0()) {
-      PRINT_TENSOR("tOrO_intra", tOrO_intra);
-    }
+//    if (thread0()) {
+//      PRINT_TENSOR("tOrO_intra", tOrO_intra);
+//    }
 
 //    if (thread0()) {
 //      PRINT_TENSOR("tOrO_intra", tOrO_intra);
@@ -242,29 +242,37 @@ __global__ void flash_forward(const half_t* q, const half_t* k, const half_t* v,
 
     // O = O_intra + O_inter
     cute::axpby(1.0, tOrO_intra, 1.0, tCrO_inter);
-    if (thread0()) {
-      PRINT_TENSOR("tCrO_inter", tCrO_inter);
-    }
+//    if (thread0()) {
+//      PRINT_TENSOR("tCrO_inter", tCrO_inter);
+//    }
 
 
     // write O to global memory
     Tensor tCgO = thr_mma.partition_C(gO);
     cute::copy(tCrO_inter, tCgO);
     __syncthreads();
-//
-//    // Update KV
-//    // new_kv = tl.dot(k_t, v) d x BLOCK @ d x BLOCK = d x  d
-//    // kv = kv * block_decay + new_kv, block_decay = 1.0
-//    Tensor tAgKt = thr_mma.partition_A(gKt);
-//    Tensor tArKt = thr_mma.partition_fragment_A(gKt);
-//    cute::copy(tAgKt, tArKt);
-//
-//    Tensor tCrNewKV = thr_mma.partition_fragment_C(make_shape(Int<kHeadDim>{}, Int<kHeadDim>{}));
-//    clear(tCrNewKV);
-//    cute::gemm(tArKt, tBrVt, tCrNewKV);
-//    Tensor tCsKV = thr_mma.partition_C(sKV);
-//
-//    cute::axpby(1.0, tCrNewKV, 1.0, tCsKV);
+
+    if (thread0()) {
+      PRINT_TENSOR("tCgO", tCgO);
+    }
+
+
+    // Update KV
+    // new_kv = tl.dot(k_t, v) d x BLOCK @ d x BLOCK = d x  d
+    // kv = kv * block_decay + new_kv, block_decay = 1.0
+    Tensor tAgKt = thr_mma.partition_A(gKt);
+    Tensor tArKt = thr_mma.partition_fragment_A(gKt);
+    cute::copy(tAgKt, tArKt);
+
+    Tensor tCrNewKV = thr_mma.partition_fragment_C(make_shape(Int<kHeadDim>{}, Int<kHeadDim>{}));
+    clear(tCrNewKV);
+    cute::gemm(tArKt, tBrVt, tCrNewKV);
+
+    cute::axpby(1.0, tCrNewKV, 1.0, tCrKV);
+
+    if (thread0()) {
+      PRINT_TENSOR("tCrKV", tCrKV);
+    }
   }
 
 }
