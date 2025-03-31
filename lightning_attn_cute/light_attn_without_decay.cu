@@ -188,13 +188,13 @@ __global__ void flash_forward(const half_t* q, const half_t* k, const half_t* v,
     Tensor tOrVt = thr_mma.partition_fragment_B(gVt);
     cute::copy(tOgVt, tOrVt);
 
-    Tensor tOrO_intra = partition_fragment_C(mma, make_shape(Int<BLOCK>{}, Int<kHeadDim>{})); //BLOCK x d
-    cute::clear(tOrO_intra);
-    cute::gemm(tOrS, tOrVt, tOrO_intra);
-
-    if (thread0()) {
-      PRINT_TENSOR("tOrO_intra", tOrO_intra);
-    }
+//    Tensor tOrO_intra = partition_fragment_C(mma, make_shape(Int<BLOCK>{}, Int<kHeadDim>{})); //BLOCK x d
+//    cute::clear(tOrO_intra);
+//    cute::gemm(tOrS, tOrVt, tOrO_intra);
+//
+//    if (thread0()) {
+//      PRINT_TENSOR("tOrO_intra", tOrO_intra);
+//    }
 //
 //
 //    // 计算 o_inter = q @ kv -> BLOCK x d @ d x d = BLOCK x d
