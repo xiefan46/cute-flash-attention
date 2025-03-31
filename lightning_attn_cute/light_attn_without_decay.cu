@@ -151,12 +151,13 @@ __global__ void flash_forward(const half_t* q, const half_t* k, const half_t* v,
     cute::gemm(mma, tArQ, tBrK, tCrS);
 
 
-//    if (thread0()) {
-//      PRINT("tAgQ", tAgQ);
-//      PRINT("tArQ", tArQ);
-//      PRINT("tBrK", tBrK);
-//      PRINT("tCrS", tCrS);
-//    }
+    if (thread0()) {
+      PRINT("tAgQ", tAgQ);
+      PRINT("tArQ", tArQ);
+      PRINT("tBgK", tBgK);
+      PRINT("tBrK", tBrK);
+
+    }
 //
 //    if (thread0()) {
 //      // PRINT_TENSOR("tArQ tensor", tArQ);
