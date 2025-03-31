@@ -75,18 +75,6 @@ struct FlashConfig {
 //        block_off += BLOCK
 
 
-template <typename To_type, typename Engine, typename Layout>
-__forceinline__ __device__ auto convert_type(Tensor<Engine, Layout> const &tensor) {
-    using From_type = typename Engine::value_type;
-    constexpr int numel = decltype(size(tensor))::value;
-    cutlass::NumericArrayConverter<To_type, From_type, numel> convert_op;
-    // HACK: this requires tensor to be "contiguous"
-    auto frag = convert_op(*reinterpret_cast<const cutlass::Array<From_type, numel> *>(tensor.data()));
-    return make_tensor(make_rmem_ptr<To_type>(&frag), tensor.layout());
-}
-
-
-
 // TODO:
 // 1. smem要怎么处理才能避免相互覆盖的问题
 // 2. smem如何处理多stage
@@ -168,10 +156,17 @@ __global__ void flash_forward(const half_t* q, const half_t* k, const half_t* v,
 //      PRINT_TENSOR("tCrS tensor", tCrS);
 //    }
     // ((_2,_2),_4,_8):((_1,_2),_4,_16)
-    Tensor tCrS_f16 = convert_type<half_t>(tCrS);
+
+    auto tCrS_fp16 = make_tensor_like<half_t>(tCrS);
+    auto tCrS_fp32x2 = recast<float2>(tCrS);
+    auto tCrS_fp16x2 = recast<half2>(tCrS_fp16);
+#pragma unroll
+    for (int si = 0; si < size(scores_fp16x2); si++) {
+      tCrS_fp16x2(si) = __float22half2_rn(scores_fp32x2(si));
+    }
 
     if (thread0()) {
-      PRINT_TENSOR("tCrS_f16", tCrS_f16);
+      PRINT_TENSOR("tCrS_fp16", tCrS_fp16);
     }
 
     // 将tCrS_f16转换为A layout，并且进行第二个gemm的计算
