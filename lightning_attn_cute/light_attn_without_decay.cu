@@ -181,6 +181,7 @@ __global__ void flash_forward(const half_t* q, const half_t* k, const half_t* v,
     Tensor tOrS = make_tensor(tCrS_f16.data(), tOrS_laytout);
     if (thread0()) {
       PRINT("tOrS", tOrS);
+      PRINT_TENSOR("tOrS tensor", tOrS);
     }
 
     // auto tArS_new_layout = make_layout(make_layout(_2, _2, _2), get<1>);
