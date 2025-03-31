@@ -195,6 +195,10 @@ __global__ void flash_forward(const half_t* q, const half_t* k, const half_t* v,
     Tensor tOrO_intra = partition_fragment_C(mma, make_shape(Int<BLOCK>{}, Int<kHeadDim>{})); //BLOCK x d
     cute::clear(tOrO_intra);
 
+    if (thread0()) {
+      PRINT("tOrO_intra", tOrO_intra);
+    }
+
     // cute::gemm(tOrS, tOrVt, tOrO_intra);
 //
 //    if (thread0()) {
