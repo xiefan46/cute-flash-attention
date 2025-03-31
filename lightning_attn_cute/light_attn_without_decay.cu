@@ -268,7 +268,7 @@ __global__ void flash_forward(const half_t* q, const half_t* k, const half_t* v,
     cute::copy(tAgKt, tArKt);
     cute::copy(tBgVt, tBrVt);
 
-    Tensor tCrNewKV = thr_mma.partition_fragment_C(make_shape(Int<kHeadDim>{}, Int<kHeadDim>{}));
+    Tensor tCrNewKV = partition_fragment_C(mma, make_shape(Int<kHeadDim>{}, Int<kHeadDim>{}));
     clear(tCrNewKV);
     cute::gemm(tArKt, tBrVt, tCrNewKV);
 
