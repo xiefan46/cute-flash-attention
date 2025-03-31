@@ -110,10 +110,7 @@ __global__ void flash_forward(const half_t* q, const half_t* k, const half_t* v,
     PRINT("mma size", size(mma));
   }
 
-  Tensor tCrKV = partition_fragment_C(mma, make_shape(Int<kHeadDim>{}, Int<kHeadDim>{})); //d x d
-
-
-
+  Tensor tBrKV = partition_fragment_B(mma, make_shape(Int<kHeadDim>{}, Int<kHeadDim>{})); //d x d
 
   for (int block_id = 0; block_id < num_block; block_id++) {
     Tensor gQ = local_tile(Q, make_tile(Int<BLOCK>{}, Int<kHeadDim>{}), make_coord(block_id, 0)); //BLOCK x d
@@ -154,7 +151,7 @@ __global__ void flash_forward(const half_t* q, const half_t* k, const half_t* v,
       PRINT("tArQ", tArQ);
       PRINT("tBgK", tBgK);
       PRINT("tBrK", tBrK);
-      PRINT_TENSOR("tCrS tensor", tCrS);
+      // PRINT_TENSOR("tCrS tensor", tCrS);
     }
 //
 //    if (thread0()) {
@@ -171,9 +168,9 @@ __global__ void flash_forward(const half_t* q, const half_t* k, const half_t* v,
       tCrS_fp16x2(si) = __float22half2_rn(tCrS_fp32x2(si));
     }
 
-    if (thread0()) {
-      PRINT_TENSOR("tCrS_fp16", tCrS_fp16);
-    }
+//    if (thread0()) {
+//      PRINT_TENSOR("tCrS_fp16", tCrS_fp16);
+//    }
 
     // 将tCrS_f16转换为A layout，并且进行第二个gemm的计算
     // ((_2,_2),_4,_8) -> ((_2,_2),_4, (2, 4)) ->  -> ((2, 2, 2), 4, 4)
@@ -184,10 +181,10 @@ __global__ void flash_forward(const half_t* q, const half_t* k, const half_t* v,
       PRINT("tOrS_laytout", tOrS_laytout);
     }
     Tensor tOrS = make_tensor(tCrS_fp16.data(), tOrS_laytout);
-    if (thread0()) {
-      PRINT("tOrS", tOrS);
-      PRINT_TENSOR("tOrS tensor", tOrS);
-    }
+//    if (thread0()) {
+//      PRINT("tOrS", tOrS);
+//      PRINT_TENSOR("tOrS tensor", tOrS);
+//    }
 
 
 	  Tensor tOgVt = thr_mma.partition_B(gVt);
@@ -211,16 +208,17 @@ __global__ void flash_forward(const half_t* q, const half_t* k, const half_t* v,
     if (thread0()) {
       PRINT_TENSOR("tOrO_intra", tOrO_intra);
     }
-//
-//
-//    // 计算 o_inter = q @ kv -> BLOCK x d @ d x d = BLOCK x d
-//
-//    Tensor tBsKV = thr_mma.partition_B(sKV);
-//    Tensor tBrKV = thr_mma.partition_fragment(sKV);
-//    cute::copy(tBsKV, tBrKV);
-//    Tensor tCrO_inter = thr_mma.partition_fragment_C(make_shape(Int<BLOCK>{}, Int<kHeadDim>{}));
-//    cute::clear(tCrO_inter);
-//    cute::gemm(tArQ, tBrKV, tCrO_inter);
+
+
+    // 计算 o_inter = q @ kv -> BLOCK x d @ d x d = BLOCK x d
+
+    Tensor tCrO_inter = thr_mma.partition_fragment_C(make_shape(Int<BLOCK>{}, Int<kHeadDim>{}));
+    cute::clear(tCrO_inter);
+    cute::gemm(tArQ, tBrKV, tCrO_inter);
+
+    if (thread0()) {
+      PRINT_TENSOR("tCrO_inter", tCrO_inter);
+    }
 //
 //    // O = O_intra + O_inter
 //    cute::axpby(1.0, tCrO_intra, 1.0, tCrO_inter);
