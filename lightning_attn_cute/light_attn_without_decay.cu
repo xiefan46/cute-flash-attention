@@ -169,7 +169,10 @@ __global__ void flash_forward(const half_t* q, const half_t* k, const half_t* v,
 //    }
     // ((_2,_2),_4,_8):((_1,_2),_4,_16)
     Tensor tCrS_f16 = convert_type<half_t>(tCrS);
-//
+
+    if (thread0()) {
+      PRINT_TENSOR("tCrS_f16", tCrS_f16);
+    }
 
     // 将tCrS_f16转换为A layout，并且进行第二个gemm的计算
     // ((_2,_2),_4,_8) -> ((_2,_2),_4, (2, 4)) ->  -> ((2, 2, 2), 4, 4)
