@@ -160,6 +160,7 @@ __global__ void flash_forward(const half_t* q, const half_t* k, const half_t* v,
       PRINT("tArQ", tArQ);
       PRINT("tBgK", tBgK);
       PRINT("tBrK", tBrK);
+      PRINT("tCrS tensor", tCrS);
     }
 //
 //    if (thread0()) {
