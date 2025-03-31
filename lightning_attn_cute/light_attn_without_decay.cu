@@ -128,7 +128,7 @@ __global__ void flash_forward(const half_t* q, const half_t* k, const half_t* v,
   for (int block_id = 0; block_id < num_block; block_id++) {
     Tensor gQ = local_tile(Q, make_tile(Int<BLOCK>{}, Int<kHeadDim>{}), make_coord(block_id, 0)); //BLOCK x d
     Tensor gK = local_tile(K, make_tile(Int<BLOCK>{}, Int<kHeadDim>{}), make_coord(block_id, 0)); //BLOCK x d
-    Tensor gKt = local_tile(Kt, make_tile(Int<kHeadDim>{}, Int<BLOCK>{}), make_coord(0, block_id)); //BLOCK x d
+    Tensor gKt = local_tile(Kt, make_tile(Int<kHeadDim>{}, Int<BLOCK>{}), make_coord(0, block_id)); // d x BLOCK
     Tensor gVt = local_tile(Vt, make_tile(Int<kHeadDim>{}, Int<BLOCK>{}), make_coord(0, block_id)); //d x BLOCK
     Tensor gO = local_tile(O, make_tile(Int<BLOCK>{}, Int<kHeadDim>{}), make_coord(block_id, 0));
 
@@ -270,13 +270,13 @@ __global__ void flash_forward(const half_t* q, const half_t* k, const half_t* v,
 
     Tensor tCrNewKV = partition_fragment_C(mma, make_shape(Int<kHeadDim>{}, Int<kHeadDim>{}));
     clear(tCrNewKV);
-    cute::gemm(tArKt, tBrVt, tCrNewKV);
+    // cute::gemm(tArKt, tBrVt, tCrNewKV);
 
-    cute::axpby(1.0, tCrNewKV, 1.0, tCrKV);
-
-    if (thread0()) {
-      PRINT_TENSOR("tCrKV", tCrKV);
-    }
+//    cute::axpby(1.0, tCrNewKV, 1.0, tCrKV);
+//
+//    if (thread0()) {
+//      PRINT_TENSOR("tCrKV", tCrKV);
+//    }
   }
 
 }
