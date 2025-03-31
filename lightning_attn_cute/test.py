@@ -89,6 +89,7 @@ def set_seed(seed=42):
 
 def test_forward_without_decay(q, k, v):
     b = myflash.forward_without_decay(q, k, v)
+    print(f"b : {b}")
 
 # index = block_off[:, None] - block_off[None, :]  # 相对位置 BLOCK x BLOCK
 # s_index = -slope * index  # BLOCK * BLOCK
