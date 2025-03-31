@@ -75,6 +75,19 @@ struct FlashConfig {
 //        block_off += BLOCK
 
 
+template<typename Tensor>
+__forceinline__ __device__ auto fp32_to_fp16(Tensor& src_fp32) {
+  using namespace cute;
+  auto dest_fp16 = make_tensor_like<half_t>(src_fp32);
+  auto src_fp32x2 = recast<float2>(src_fp32);
+  auto dest_fp16x2 = recast<half2>(dest_fp16);
+#pragma unroll
+  for (int si = 0; si < size(dest_fp16x2); si++) {
+    dest_fp16x2(si) = __float22half2_rn(src_fp32x2(si));
+  }
+  return dest_fp16;
+}
+
 // TODO:
 // 1. smem要怎么处理才能避免相互覆盖的问题
 // 2. smem如何处理多stage
@@ -110,7 +123,7 @@ __global__ void flash_forward(const half_t* q, const half_t* k, const half_t* v,
     PRINT("mma size", size(mma));
   }
 
-  Tensor tBrKV = partition_fragment_B(mma, make_shape(Int<kHeadDim>{}, Int<kHeadDim>{})); //d x d
+  Tensor tCrKV = partition_fragment_C(mma, make_shape(Int<kHeadDim>{}, Int<kHeadDim>{})); //d x d
 
   for (int block_id = 0; block_id < num_block; block_id++) {
     Tensor gQ = local_tile(Q, make_tile(Int<BLOCK>{}, Int<kHeadDim>{}), make_coord(block_id, 0)); //BLOCK x d
@@ -156,13 +169,14 @@ __global__ void flash_forward(const half_t* q, const half_t* k, const half_t* v,
 //    }
     // ((_2,_2),_4,_8):((_1,_2),_4,_16)
 
-    auto tCrS_fp16 = make_tensor_like<half_t>(tCrS);
-    auto tCrS_fp32x2 = recast<float2>(tCrS);
-    auto tCrS_fp16x2 = recast<half2>(tCrS_fp16);
-#pragma unroll
-    for (int si = 0; si < size(tCrS_fp16x2); si++) {
-      tCrS_fp16x2(si) = __float22half2_rn(tCrS_fp32x2(si));
-    }
+//    auto tCrS_fp16 = make_tensor_like<half_t>(tCrS);
+//    auto tCrS_fp32x2 = recast<float2>(tCrS);
+//    auto tCrS_fp16x2 = recast<half2>(tCrS_fp16);
+//#pragma unroll
+//    for (int si = 0; si < size(tCrS_fp16x2); si++) {
+//      tCrS_fp16x2(si) = __float22half2_rn(tCrS_fp32x2(si));
+//    }
+    auto tCrS_fp16 = fp32_to_fp16(tCrS);
 
 //    if (thread0()) {
 //      PRINT_TENSOR("tCrS_fp16", tCrS_fp16);
@@ -210,7 +224,10 @@ __global__ void flash_forward(const half_t* q, const half_t* k, const half_t* v,
 
     Tensor tCrO_inter = thr_mma.partition_fragment_C(make_shape(Int<BLOCK>{}, Int<kHeadDim>{}));
     cute::clear(tCrO_inter);
-    cute::gemm(tArQ, tBrKV, tCrO_inter);
+
+    auto tBrKV_fp16 = fp32_to_fp16(tCrKV);
+
+    cute::gemm(tArQ, tBrKV_fp16, tCrO_inter);
 
     if (thread0()) {
       PRINT_TENSOR("tCrO_inter", tCrO_inter);
