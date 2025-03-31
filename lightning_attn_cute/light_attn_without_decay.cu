@@ -85,6 +85,8 @@ __forceinline__ __device__ auto convert_type(Tensor<Engine, Layout> const &tenso
     return make_tensor(make_rmem_ptr<To_type>(&frag), tensor.layout());
 }
 
+
+
 // TODO:
 // 1. smem要怎么处理才能避免相互覆盖的问题
 // 2. smem如何处理多stage
@@ -121,7 +123,7 @@ __global__ void flash_forward(const half_t* q, const half_t* k, const half_t* v,
   }
 
   Tensor tCrKV = partition_fragment_C(mma, make_shape(Int<kHeadDim>{}, Int<kHeadDim>{})); //d x d
-  Tensor tCrS = partition_fragment_C(mma, make_shape(Int<BLOCK>{}, Int<BLOCK>{})); //BLOCK x BLOCK
+
 
   if (thread0()) {
      PRINT("tCrS", tCrS);
@@ -143,7 +145,7 @@ __global__ void flash_forward(const half_t* q, const half_t* k, const half_t* v,
     Tensor tBrK = thr_mma.partition_fragment_B(gK);
     cute::copy(tAgQ, tArQ);
     cute::copy(tBgK, tBrK);
-
+    Tensor tCrS = partition_fragment_C(mma, make_shape(Int<BLOCK>{}, Int<BLOCK>{}));
     clear(tCrS);
 
 	__syncthreads();
@@ -156,19 +158,25 @@ __global__ void flash_forward(const half_t* q, const half_t* k, const half_t* v,
       PRINT("tArQ", tArQ);
       PRINT("tBgK", tBgK);
       PRINT("tBrK", tBrK);
-
     }
 //
 //    if (thread0()) {
 //      // PRINT_TENSOR("tArQ tensor", tArQ);
 //      PRINT_TENSOR("tCrS tensor", tCrS);
 //    }
-//    Tensor tCrS_f16 = convert_type<half_t>(tCrS);
+    // ((_2,_2),_4,_8):((_1,_2),_4,_16)
+    Tensor tCrS_f16 = convert_type<half_t>(tCrS);
 //
-//    // 以A的layout读入S矩阵并且与Vt进行第二个gemm的计算
-//    Tensor tAsS = thr_mma.partition_A(sS);
-//    Tensor tArS = thr_mma.partition_fragment_A(sS);
-//    cute::copy(tAsS, tArS);
+
+    // 将tCrS_f16转换为A layout，并且进行第二个gemm的计算
+    // ((_2,_2),_4,_8) -> ((_2,_2),_4, (2, 4)) ->  -> ((2, 2, 2), 4, 4)
+    auto l = logical_divide(tCrS_f16.layout(), Shape<X, X, Int<2>>{});
+
+    if (thread0()) {
+      PRINT("l", l);
+    }
+    // auto tArS_new_layout = make_layout(make_layout(_2, _2, _2), get<1>);
+
 //
 //	  Tensor tBgVt = thr_mma.partition_B(gVt);
 //    Tensor tBrVt = thr_mma.partition_fragment_B(gVt);
