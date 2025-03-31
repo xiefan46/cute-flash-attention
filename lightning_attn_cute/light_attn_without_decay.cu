@@ -173,9 +173,10 @@ __global__ void flash_forward(const half_t* q, const half_t* k, const half_t* v,
     // 将tCrS_f16转换为A layout，并且进行第二个gemm的计算
     // ((_2,_2),_4,_8) -> ((_2,_2),_4, (2, 4)) ->  -> ((2, 2, 2), 4, 4)
     auto l = logical_divide(tCrS_f16.layout(), Shape<X, X, Int<2>>{});
-
+    auto new_laytout = make_layout(make_layout(get<0, 0>(l), get<0, 1>(l), get<2, 0>(l)), get<1>(l), get<2, 1>(l));
     if (thread0()) {
       PRINT("l", l);
+      PRINT("new_laytout", new_laytout);
     }
     // auto tArS_new_layout = make_layout(make_layout(_2, _2, _2), get<1>);
 
