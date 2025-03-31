@@ -162,7 +162,7 @@ __global__ void flash_forward(const half_t* q, const half_t* k, const half_t* v,
     auto tCrS_fp16x2 = recast<half2>(tCrS_fp16);
 #pragma unroll
     for (int si = 0; si < size(tCrS_fp16x2); si++) {
-      tCrS_fp16x2(si) = __float22half2_rn(scores_fp32x2(si));
+      tCrS_fp16x2(si) = __float22half2_rn(tCrS_fp32x2(si));
     }
 
     if (thread0()) {
