@@ -130,10 +130,6 @@ __global__ void flash_forward(const half_t* q, const half_t* k, const half_t* v,
     Tensor tCrS = partition_fragment_C(mma, make_shape(Int<BLOCK>{}, Int<BLOCK>{}));
     clear(tCrS);
 
-    if (thread0()) {
-      PRINT("tCrS", tCrS);
-      PRINT("tCrKV", tCrKV);
-    }
 
 	__syncthreads();
 
