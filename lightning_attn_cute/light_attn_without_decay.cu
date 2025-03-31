@@ -106,8 +106,8 @@ __global__ void flash_forward(const half_t* q, const half_t* k, const half_t* v,
   const int bx = blockIdx.x;
   const int tx = threadIdx.x;
   const int bs_head_offset = bx * N * kHeadDim;
-  // const int num_block = N / BLOCK;
-  const int num_block = 1;
+  const int num_block = N / BLOCK;
+  // const int num_block = 1;
 
   Tensor Q = make_tensor(make_gmem_ptr<half_t>(q + bs_head_offset), make_shape(N, Int<kHeadDim>{}), make_stride(Int<kHeadDim>{}, Int<1>{})); // N x d
   Tensor K = make_tensor(make_gmem_ptr<half_t>(k + bs_head_offset), make_shape(N, Int<kHeadDim>{}), make_stride(Int<kHeadDim>{}, Int<1>{})); // N x d
