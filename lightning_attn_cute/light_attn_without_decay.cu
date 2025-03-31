@@ -205,17 +205,12 @@ __global__ void flash_forward(const half_t* q, const half_t* k, const half_t* v,
       PRINT("tOrO_intra", tOrO_intra);
     }
 
-    if (thread0()) {
-      PRINT("tOrS size", size(tOrS));
-      PRINT("tOrVt size", size(tOrVt));
-      PRINT("tOrO_intra size", size(tOrO_intra));
-    }
 
     cute::gemm(mma, tOrS, tOrVt, tOrO_intra);
-//
-//    if (thread0()) {
-//      PRINT_TENSOR("tOrO_intra", tOrO_intra);
-//    }
+
+    if (thread0()) {
+      PRINT_TENSOR("tOrO_intra", tOrO_intra);
+    }
 //
 //
 //    // 计算 o_inter = q @ kv -> BLOCK x d @ d x d = BLOCK x d
