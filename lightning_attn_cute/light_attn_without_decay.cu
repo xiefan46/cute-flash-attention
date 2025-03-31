@@ -239,7 +239,7 @@ __global__ void flash_forward(const half_t* q, const half_t* k, const half_t* v,
 
 
     // O = O_intra + O_inter
-    cute::axpby(1.0, tCrO_intra, 1.0, tCrO_inter);
+    cute::axpby(1.0, tOrO_intra, 1.0, tCrO_inter);
     if (thread0()) {
       PRINT_TENSOR("tCrO_inter", tCrO_inter);
     }
