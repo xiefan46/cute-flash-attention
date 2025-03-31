@@ -225,17 +225,20 @@ __global__ void flash_forward(const half_t* q, const half_t* k, const half_t* v,
     Tensor tCrO_inter = partition_fragment_C(mma, make_shape(Int<BLOCK>{}, Int<kHeadDim>{}));
     cute::clear(tCrO_inter);
 
-    auto tBrKV_fp16 = fp32_to_fp16(tCrKV);
+    auto tCrKV_fp16 = fp32_to_fp16(tCrKV);
 
     if (thread0()) {
       PRINT("tBrKV_fp16", tBrKV_fp16);
     }
 
+    auto l2 = tCrKV_fp16.layout();
+    auto tBrKV_fp16 = make_tensor(tCrKV_fp16.data(), make_layout(get<0>(l2), get<2>(l2), get<1>(l2)));
+
     cute::gemm(mma, tArQ, tBrKV_fp16, tCrO_inter);
-//
-//    if (thread0()) {
-//      PRINT_TENSOR("tCrO_inter", tCrO_inter);
-//    }
+
+    if (thread0()) {
+      PRINT_TENSOR("tCrO_inter", tCrO_inter);
+    }
 //
 //    // O = O_intra + O_inter
 //    cute::axpby(1.0, tCrO_intra, 1.0, tCrO_inter);
