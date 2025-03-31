@@ -270,6 +270,13 @@ __global__ void flash_forward(const half_t* q, const half_t* k, const half_t* v,
 
     Tensor tCrNewKV = partition_fragment_C(mma, make_shape(Int<kHeadDim>{}, Int<kHeadDim>{}));
     clear(tCrNewKV);
+
+    if (thread0()) {
+      PRINT("tArKt", tArKt);
+      PRINT("tBrVt", tBrVt);
+      PRINT("tCrNewKV", tCrNewKV);
+    }
+
     // cute::gemm(tArKt, tBrVt, tCrNewKV);
 
 //    cute::axpby(1.0, tCrNewKV, 1.0, tCrKV);
