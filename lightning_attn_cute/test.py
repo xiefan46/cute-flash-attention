@@ -9,7 +9,7 @@ import numpy as np
 # from flash_attn import flash_attn_func
 
 # Add a new environment variable  
-os.environ['TORCH_CUDA_ARCH_LIST'] = '8.0'
+os.environ['TORCH_CUDA_ARCH_LIST'] = '9.0'
 
 REMOVE_NVCC_FLAGS = [
     "-D__CUDA_NO_HALF_OPERATORS__",
