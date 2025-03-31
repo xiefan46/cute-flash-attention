@@ -106,21 +106,12 @@ __global__ void flash_forward(const half_t* q, const half_t* k, const half_t* v,
   // const int num_block = N / BLOCK;
   const int num_block = 1;
 
-  __shared__ half_t smem_S[BLOCK * BLOCK];
-  __shared__ half_t smem_KV[kHeadDim * kHeadDim]; // dxd
-
-
   Tensor Q = make_tensor(make_gmem_ptr<half_t>(q + bs_head_offset), make_shape(N, Int<kHeadDim>{}), make_stride(Int<kHeadDim>{}, Int<1>{})); // N x d
   Tensor K = make_tensor(make_gmem_ptr<half_t>(k + bs_head_offset), make_shape(N, Int<kHeadDim>{}), make_stride(Int<kHeadDim>{}, Int<1>{})); // N x d
   Tensor Kt = make_tensor(make_gmem_ptr<half_t>(k + bs_head_offset), make_shape(Int<kHeadDim>{}, N), make_stride(Int<1>{}, Int<kHeadDim>{})); // d x N
   Tensor Vt = make_tensor(make_gmem_ptr<half_t>(v + bs_head_offset), make_shape(Int<kHeadDim>{}, N), make_stride(Int<1>{}, Int<kHeadDim>{})); // d x N
   Tensor O = make_tensor(make_gmem_ptr<half_t>(o + bs_head_offset), make_shape(N, Int<kHeadDim>{}), make_stride(Int<kHeadDim>{}, Int<1>{})); // N x d
 
-  
-  // shared memory tensors
-  Tensor sS = make_tensor(make_smem_ptr<half_t>(&smem_S), make_shape(Int<BLOCK>{}, Int<BLOCK>{}), make_stride(Int<BLOCK>{}, Int<1>{}));
-  Tensor sKV = make_tensor(make_smem_ptr<half_t>(&smem_KV), make_shape(Int<kHeadDim>{}, Int<kHeadDim>{}),
-                             make_stride(Int<kHeadDim>{}, Int<1>{}));
 
   TiledMMA mma;
   ThrMMA thr_mma = mma.get_slice(tx);
@@ -129,8 +120,13 @@ __global__ void flash_forward(const half_t* q, const half_t* k, const half_t* v,
     PRINT("mma size", size(mma));
   }
 
+  Tensor tCrKV = partition_fragment_C(mma, make_shape(Int<kHeadDim>{}, Int<kHeadDim>{})); //d x d
+  Tensor tCrS = partition_fragment_C(mma, make_shape(Int<BLOCK>{}, Int<BLOCK>{})); //BLOCK x BLOCK
 
-  auto tmp_a = make_layout(make_shape(Int<BLOCK>{}, Int<BLOCK>{}));
+  if (thread0()) {
+     PRINT("tCrS", tCrS);
+     PRINT("tCrKV", tCrKV);
+  }
 
   for (int block_id = 0; block_id < num_block; block_id++) {
     Tensor gQ = local_tile(Q, make_tile(Int<BLOCK>{}, Int<kHeadDim>{}), make_coord(block_id, 0)); //BLOCK x d
@@ -146,14 +142,10 @@ __global__ void flash_forward(const half_t* q, const half_t* k, const half_t* v,
     Tensor tBgK = thr_mma.partition_B(gK);
     Tensor tBrK = thr_mma.partition_fragment_B(gK);
 
-    Tensor tCsS = thr_mma.partition_C(sS);
-
 
     cute::copy(tAgQ, tArQ);
     cute::copy(tBgK, tBrK);
 
-    // Tensor tCrS = partition_fragment_C(mma, make_shape(Int<BLOCK>{}, Int<BLOCK>{})); //BLOCK x BLOCK
-    Tensor tCrS = thr_mma.make_fragment_C(tCsS);
     clear(tCrS);
 
 	__syncthreads();
@@ -163,24 +155,20 @@ __global__ void flash_forward(const half_t* q, const half_t* k, const half_t* v,
 
     // 将S矩阵寄存器中的结果写入到shared memroy
 
-    if (thread0()) {
-      PRINT("tmp_a", tmp_a);
-      PRINT("sS", sS);
-      PRINT("sKV", sKV);
-      PRINT("tAgQ", tAgQ);
-      PRINT("tArQ", tArQ);
-      PRINT("tBrK", tBrK);
-      PRINT("tCsS", tCsS);
-      PRINT("tCrS", tCrS);
-    }
-
-    if (thread0()) {
-      // PRINT_TENSOR("tArQ tensor", tArQ);
-      PRINT_TENSOR("tCrS tensor", tCrS((1, 1), 3, _));
-    }
-    Tensor tCrS_f16 = convert_type<half_t>(tCrS);
-    cute::copy(tCrS_f16, tCsS);
-    __syncthreads();
+//    if (thread0()) {
+//      PRINT("tAgQ", tAgQ);
+//      PRINT("tArQ", tArQ);
+//      PRINT("tBrK", tBrK);
+//      PRINT("tCrS", tCrS);
+//    }
+//
+//    if (thread0()) {
+//      // PRINT_TENSOR("tArQ tensor", tArQ);
+//      PRINT_TENSOR("tCrS tensor", tCrS((1, 1), 3, _));
+//    }
+//    Tensor tCrS_f16 = convert_type<half_t>(tCrS);
+//    cute::copy(tCrS_f16, tCsS);
+//    __syncthreads();
 //
 //    // 以A的layout读入S矩阵并且与Vt进行第二个gemm的计算
 //    Tensor tAsS = thr_mma.partition_A(sS);
