@@ -106,8 +106,7 @@ __global__ void flash_forward(const half_t* q, const half_t* k, const half_t* v,
   const int bx = blockIdx.x;
   const int tx = threadIdx.x;
   const int bs_head_offset = bx * N * kHeadDim;
-  const int num_block = N / BLOCK;
-  // const int num_block = 1;
+  const int num_block = (N + BLOCK - 1) / BLOCK;
 
   Tensor Q = make_tensor(make_gmem_ptr<half_t>(q + bs_head_offset), make_shape(N, Int<kHeadDim>{}), make_stride(Int<kHeadDim>{}, Int<1>{})); // N x d
   Tensor K = make_tensor(make_gmem_ptr<half_t>(k + bs_head_offset), make_shape(N, Int<kHeadDim>{}), make_stride(Int<kHeadDim>{}, Int<1>{})); // N x d
@@ -121,6 +120,7 @@ __global__ void flash_forward(const half_t* q, const half_t* k, const half_t* v,
 
   if (thread0()) {
     PRINT("mma size", size(mma));
+    PRINT("num_block", num_block);
   }
 
   Tensor tCrKV = partition_fragment_C(mma, make_shape(Int<kHeadDim>{}, Int<kHeadDim>{})); //d x d
@@ -144,83 +144,27 @@ __global__ void flash_forward(const half_t* q, const half_t* k, const half_t* v,
     clear(tCrS);
 
 
-	__syncthreads();
+	  __syncthreads();
 
-    if (thread0()) {
-      PRINT("tArQ size", size(tArQ));
-      PRINT("tBrK size", size(tBrK));
-      PRINT("tCrS size", size(tCrS));
-    }
 
     cute::gemm(mma, tArQ, tBrK, tCrS);
 
-
-    if (thread0()) {
-      PRINT("tAgQ", tAgQ);
-      PRINT("tArQ", tArQ);
-      PRINT("tBgK", tBgK);
-      PRINT("tBrK", tBrK);
-      // PRINT_TENSOR("tCrS tensor", tCrS);
-    }
-//
-//    if (thread0()) {
-//      // PRINT_TENSOR("tArQ tensor", tArQ);
-//      PRINT_TENSOR("tCrS tensor", tCrS);
-//    }
-    // ((_2,_2),_4,_8):((_1,_2),_4,_16)
-
-//    auto tCrS_fp16 = make_tensor_like<half_t>(tCrS);
-//    auto tCrS_fp32x2 = recast<float2>(tCrS);
-//    auto tCrS_fp16x2 = recast<half2>(tCrS_fp16);
-//#pragma unroll
-//    for (int si = 0; si < size(tCrS_fp16x2); si++) {
-//      tCrS_fp16x2(si) = __float22half2_rn(tCrS_fp32x2(si));
-//    }
     auto tCrS_fp16 = fp32_to_fp16(tCrS);
-
-//    if (thread0()) {
-//      PRINT_TENSOR("tCrS_fp16", tCrS_fp16);
-//    }
 
     // 将tCrS_f16转换为A layout，并且进行第二个gemm的计算
     // ((_2,_2),_4,_8) -> ((_2,_2),_4, (2, 4)) ->  -> ((2, 2, 2), 4, 4)
     auto l = logical_divide(tCrS_fp16.layout(), Shape<X, X, Int<2>>{});
     auto tOrS_laytout = make_layout(make_layout(get<0, 0>(l), get<0, 1>(l), get<2, 0>(l)), get<1>(l), get<2, 1>(l));
-    if (thread0()) {
-      PRINT("l", l);
-      PRINT("tOrS_laytout", tOrS_laytout);
-    }
     Tensor tOrS = make_tensor(tCrS_fp16.data(), tOrS_laytout);
-    if (thread0()) {
-      PRINT("tOrS", tOrS);
-      // PRINT_TENSOR("tOrS tensor", tOrS);
-    }
-
 
 	  Tensor tOgVt = thr_mma.partition_B(gVt);
     Tensor tOrVt = thr_mma.partition_fragment_B(gVt);
     cute::copy(tOgVt, tOrVt);
 
-    if (thread0()){
-      PRINT("tOrVt", tOrVt);
-    }
-
     Tensor tOrO_intra = partition_fragment_C(mma, make_shape(Int<BLOCK>{}, Int<kHeadDim>{})); //BLOCK x d
     cute::clear(tOrO_intra);
 
-
-
-
     cute::gemm(mma, tOrS, tOrVt, tOrO_intra);
-
-//    if (thread0()) {
-//      PRINT_TENSOR("tOrO_intra", tOrO_intra);
-//    }
-
-//    if (thread0()) {
-//      PRINT_TENSOR("tOrO_intra", tOrO_intra);
-//    }
-
 
     // 计算 o_inter = q @ kv -> BLOCK x d @ d x d = BLOCK x d
 
@@ -242,20 +186,10 @@ __global__ void flash_forward(const half_t* q, const half_t* k, const half_t* v,
 
     // O = O_intra + O_inter
     cute::axpby(1.0, tOrO_intra, 1.0, tCrO_inter);
-//    if (thread0()) {
-//      PRINT_TENSOR("tCrO_inter", tCrO_inter);
-//    }
-
-
     // write O to global memory
     Tensor tCgO = thr_mma.partition_C(gO);
     cute::copy(tCrO_inter, tCgO);
     __syncthreads();
-
-    if (thread0()) {
-      PRINT_TENSOR("tCgO", tCgO);
-    }
-
 
     // Update KV
     // new_kv = tl.dot(k_t, v) d x BLOCK @ d x BLOCK = d x  d
@@ -271,19 +205,17 @@ __global__ void flash_forward(const half_t* q, const half_t* k, const half_t* v,
     Tensor tCrNewKV = partition_fragment_C(mma, make_shape(Int<kHeadDim>{}, Int<kHeadDim>{}));
     clear(tCrNewKV);
 
-    if (thread0()) {
-      PRINT("tArKt", tArKt);
-      PRINT("tBrVt", tBrVt);
-      PRINT("tCrNewKV", tCrNewKV);
-    }
-
     cute::gemm(mma, tArKt, tBrVt, tCrNewKV);
+
+
+    if (thread0()) {
+      PRINT_TENSOR("tCrNewKV", tCrNewKV(_, 0, 0));
+      PRINT_TENSOR("tCrKV", tCrKV(_, 0, 0));
+    }
 
     cute::axpby(1.0, tCrNewKV, 1.0, tCrKV);
 
-    if (thread0()) {
-      PRINT_TENSOR("tCrKV", tCrKV);
-    }
+
   }
 
 }
