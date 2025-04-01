@@ -128,8 +128,8 @@ def test_forward_without_decay(q, k, v):
     torch.testing.assert_close(
         torch_output,
         cute_output,
-        rtol=1e-3,
-        atol=1e-2,
+        # rtol=1e-3,
+        # atol=1e-2,
         msg="Lightning attention implementations produce different results",
     )
 

@@ -109,10 +109,10 @@ __global__ void flash_forward(const half_t* q, const half_t* k, const half_t* v,
   const int num_block = (N + BLOCK - 1) / BLOCK;
 
   __shared__ float smem_kv[kHeadDim * kHeadDim];
-  for (int i = tx; i < kHeadDim * kHeadDim; i += blockDim.x) {
-    smem_kv[i] = __float2half(0.0f);
-  }
-  __syncthreads();
+//  for (int i = tx; i < kHeadDim * kHeadDim; i += blockDim.x) {
+//    smem_kv[i] = __float2half(0.0f);
+//  }
+//  __syncthreads();
 
   Tensor Q = make_tensor(make_gmem_ptr<half_t>(q + bs_head_offset), make_shape(N, Int<kHeadDim>{}), make_stride(Int<kHeadDim>{}, Int<1>{})); // N x d
   Tensor K = make_tensor(make_gmem_ptr<half_t>(k + bs_head_offset), make_shape(N, Int<kHeadDim>{}), make_stride(Int<kHeadDim>{}, Int<1>{})); // N x d
