@@ -76,9 +76,11 @@ def lightning_attn_no_decay(
         qi = q[:, :, si:ei, :].contiguous()
         ki = k[:, :, si:ei, :].contiguous()
         vi = v[:, :, si:ei, :].contiguous()
-        print(f"qi shape: {qi}")
+        print(f"qi shape: {qi.shape}")
 
         qkv_none_diag = torch.matmul(qi, kv.to(qi.dtype)).to(torch.float32)
+
+        print(f"qkv_none_diag: {qkv_none_diag[0, 0, 0:2, 0: 2]}")
 
         # diag
         qk = (
@@ -86,13 +88,11 @@ def lightning_attn_no_decay(
         )
         qkv_diag = torch.matmul(qk, vi.to(torch.float32))
         output[:, :, si:ei] = qkv_none_diag + qkv_diag
+        print(f"output: {output[0, 0, 0:2, 0: 2]}")
         new_kv = torch.matmul(ki.transpose(-1, -2).to(vi.dtype), vi).to(torch.float32)
-
-        print(f"torch kv: {kv[0, 0, 0: 2, 0: 2]}")
         print(f"torch new_kv: {new_kv[0, 0, 0: 2, 0: 2]}")
-
-
         kv = kv + new_kv
+        print(f"torch kv: {kv[0, 0, 0: 2, 0: 2]}")
     return output
 
 

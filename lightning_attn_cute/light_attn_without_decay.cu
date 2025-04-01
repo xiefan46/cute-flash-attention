@@ -173,16 +173,16 @@ __global__ void flash_forward(const half_t* q, const half_t* k, const half_t* v,
 
     auto tCrKV_fp16 = fp32_to_fp16(tCrKV);
 
-    if (thread0()) {
-      PRINT("tCrKV_fp16", tCrKV_fp16);
-    }
-
     auto l2 = tCrKV_fp16.layout();
     auto tBrKV_fp16 = make_tensor(tCrKV_fp16.data(), make_layout(get<0>(l2), get<2>(l2), get<1>(l2)));
 
     cute::gemm(mma, tArQ, tBrKV_fp16, tCrO_inter);
 
-
+    if (thread0()) {
+      PRINT_TENSOR("tCrKV", tCrKV)
+      PRINT_TENSOR("tBrKV_fp16", tBrKV_fp16);
+      PRINT_TENSOR("tCrO_inter", tCrO_inter(_, 0, 0));
+    }
 
     // O = O_intra + O_inter
     cute::axpby(1.0, tOrO_intra, 1.0, tCrO_inter);
@@ -209,8 +209,8 @@ __global__ void flash_forward(const half_t* q, const half_t* k, const half_t* v,
 
 
     if (thread0()) {
-      PRINT_TENSOR("tCrNewKV", tCrNewKV(_, 0, 0));
       PRINT_TENSOR("tCrKV", tCrKV(_, 0, 0));
+      PRINT_TENSOR("tCrNewKV", tCrNewKV(_, 0, 0));
     }
 
     cute::axpby(1.0, tCrNewKV, 1.0, tCrKV);
