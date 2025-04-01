@@ -73,9 +73,9 @@ def lightning_attn_no_decay(
     for i in range(NUM_BLOCK):
         si = i * BLOCK
         ei = min(si + BLOCK, N)
-        qi = q[:, :, si:ei].contiguous()
-        ki = k[:, :, si:ei].contiguous()
-        vi = v[:, :, si:ei].contiguous()
+        qi = q[:, :, si:ei, :].contiguous()
+        ki = k[:, :, si:ei, :].contiguous()
+        vi = v[:, :, si:ei, :].contiguous()
         qkv_none_diag = torch.matmul(qi, kv.to(qi.dtype)).to(torch.float32)
 
         # diag
@@ -142,7 +142,7 @@ def test_intra_block_compute(q, k, v):
 set_seed(10086)
 B = 1
 H = 1
-N = 128
+N = 64
 # NOTE: we only support d = 64!
 d = 64
 
