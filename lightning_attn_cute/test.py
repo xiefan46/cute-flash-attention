@@ -190,4 +190,4 @@ q1 = q.transpose(1, 2).contiguous()
 k1 = k.transpose(1, 2).contiguous()
 v1 = v.transpose(1, 2).contiguous()
 
-test_forward_without_decay(q1, k1, v1)
+test_forward_without_decay_precision(q1, k1, v1)
