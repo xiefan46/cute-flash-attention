@@ -148,6 +148,8 @@ def test_forward_without_decay_precision(q, k, v):
 
     print(f"torch_kv_output shape: {torch_kv_output.shape}")
     print(f"cute_kv_output shape: {cute_kv_output.shape}")
+    print(f"torch_output shape: {torch_output.shape}")
+    print(f"cute_output shape: {cute_output.shape}")
 
     print(f"torch_kv_output: {torch_kv_output}")
     print(f"cute_kv_output: {cute_kv_output}")
