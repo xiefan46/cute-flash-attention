@@ -185,10 +185,6 @@ __global__ void flash_forward(const half_t* q, const half_t* k, const half_t* v,
     Tensor tBrKVt = thr_mma.partition_fragment_B(sKVt);
     cute::copy(tBsKVt, tBrKVt);
 
-    if (thread0()) {
-      PRINT_TENSOR("tBrKVt", tBrKVt)
-    }
-
     cute::gemm(mma, tArQ, tBrKVt, tCrO_inter);
 
 //    if (thread0()) {
