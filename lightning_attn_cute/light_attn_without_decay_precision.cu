@@ -250,7 +250,7 @@ torch::Tensor forward_without_decay_precision(torch::Tensor q, torch::Tensor k, 
   int BLOCK = 64;
   int num_block = (N + BLOCK - 1) / BLOCK;
 
-  auto kv_out = torch::zeros((num_block, d, d), device=q.device, dtype=q.dtype);
+  auto kv_out = torch::zeros({num_block, d, d}, torch::TensorOptions().dtype(torch::kFloat32).device(torch::Device(torch::kCUDA, 0)));
 
   auto out = torch::empty_like(q);
 
