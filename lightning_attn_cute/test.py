@@ -80,7 +80,9 @@ def lightning_attn_no_decay(
 
         qkv_none_diag = torch.matmul(qi, kv.to(qi.dtype)).to(torch.float32)
 
-        print(f"qkv_none_diag: {qkv_none_diag[0, 0, 0:2, 0: 2]}")
+
+        print(f"kv : {kv}")
+        print(f"qkv_none_diag: {qkv_none_diag}")
 
         # diag
         qk = (

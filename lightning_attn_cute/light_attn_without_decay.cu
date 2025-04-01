@@ -181,7 +181,7 @@ __global__ void flash_forward(const half_t* q, const half_t* k, const half_t* v,
     if (thread0()) {
       PRINT_TENSOR("tCrKV", tCrKV)
       PRINT_TENSOR("tBrKV_fp16", tBrKV_fp16);
-      PRINT_TENSOR("tCrO_inter", tCrO_inter(_, 0, 0));
+      PRINT_TENSOR("tCrO_inter", tCrO_inter);
     }
 
     // O = O_intra + O_inter
@@ -208,10 +208,10 @@ __global__ void flash_forward(const half_t* q, const half_t* k, const half_t* v,
     cute::gemm(mma, tArKt, tBrVt, tCrNewKV);
 
 
-    if (thread0()) {
-      PRINT_TENSOR("tCrKV", tCrKV(_, 0, 0));
-      PRINT_TENSOR("tCrNewKV", tCrNewKV(_, 0, 0));
-    }
+//    if (thread0()) {
+//      PRINT_TENSOR("tCrKV", tCrKV(_, 0, 0));
+//      PRINT_TENSOR("tCrNewKV", tCrNewKV(_, 0, 0));
+//    }
 
     cute::axpby(1.0, tCrNewKV, 1.0, tCrKV);
 
