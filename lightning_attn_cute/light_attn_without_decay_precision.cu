@@ -8,6 +8,7 @@
 #include <cutlass/cutlass.h>
 #include <cutlass/numeric_conversion.h>
 #include <cutlass/numeric_types.h>
+#include <tuple>
 
 using namespace cute;
 
@@ -241,7 +242,7 @@ __global__ void flash_forward(const half_t* q, const half_t* k, const half_t* v,
 
 
 // q [B, H, N, d] k  [B, H, N, d] v [B, H, N, d]
-torch::Tensor forward_without_decay_precision(torch::Tensor q, torch::Tensor k, torch::Tensor v) {
+std::tuple<torch::Tensor, torch::Tensor> forward_without_decay_precision(torch::Tensor q, torch::Tensor k, torch::Tensor v) {
   int B = q.size(0);
   int H = q.size(1);
   int N = q.size(2);
@@ -264,5 +265,7 @@ torch::Tensor forward_without_decay_precision(torch::Tensor q, torch::Tensor k, 
 
   partition_kernel<<<grid, block>>>((cute::half_t*)q.data_ptr(), (cute::half_t*)k.data_ptr(),
                                               (cute::half_t*)v.data_ptr(), (cute::half_t*)out.data_ptr(), B, H, N, (float*)kv_out.data_ptr());
-  return out;
+
+  cudaDeviceSynchronize();
+  return std::make_tuple(out, kv_out);
 }
