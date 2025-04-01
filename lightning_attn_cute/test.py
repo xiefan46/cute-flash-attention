@@ -68,7 +68,8 @@ def lightning_attn_no_decay(
 ) -> torch.Tensor:
     B, H, N, d = q.shape
     NUM_BLOCK = (N + BLOCK - 1) // BLOCK
-    kv = torch.zeros(B, H, d, d).to(torch.float32).to(q.device)
+    # kv = torch.zeros(B, H, d, d).to(torch.float32).to(q.device)
+    kv = torch.zeros(B, H, d, d).to(q.dtype).to(q.device)
     output = torch.empty((B, H, N, d), dtype=q.dtype, device=q.device)
     for i in range(NUM_BLOCK):
         si = i * BLOCK
@@ -88,7 +89,8 @@ def lightning_attn_no_decay(
 
         qkv_diag = torch.matmul(qk, vi).to(torch.float32)
         output[:, :, si:ei] = qkv_none_diag + qkv_diag
-        new_kv = torch.matmul(ki.transpose(-1, -2).to(vi.dtype), vi).to(torch.float32)
+        # new_kv = torch.matmul(ki.transpose(-1, -2).to(vi.dtype), vi).to(torch.float32)
+        new_kv = torch.matmul(ki.transpose(-1, -2).to(vi.dtype), vi)
         kv = kv + new_kv
     return output
 
@@ -146,7 +148,7 @@ def test_intra_block_compute(q, k, v):
 set_seed(10086)
 B = 1
 H = 1
-N = 64
+N = 128
 # NOTE: we only support d = 64!
 d = 64
 
