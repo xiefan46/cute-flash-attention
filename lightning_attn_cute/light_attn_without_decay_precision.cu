@@ -95,7 +95,8 @@ __forceinline__ __device__ auto fp32_to_fp16(Tensor& src_fp32) {
 // 3. gmem到smem的copy似乎没有流水线
 // 4. 给smem增加static check. 参考 https://github.com/NVIDIA/cutlass/blob/main/media/docs/cute/0x_gemm_tutorial.md
 template <typename config>
-__global__ void flash_forward(const half_t* q, const half_t* k, const half_t* v, half_t* o, const int B, const int H, const int N, float* kv_out) {
+__global__ void flash_forward(const half_t* q, const half_t* k, const half_t* v, half_t* o, const int B, const int H, const int N, float* kv_out,
+                              float* o_inter_out, float* o_intra_out) {
   using namespace cute;
   using TiledMMA = typename config::TiledMMA;
 
@@ -171,7 +172,7 @@ __global__ void flash_forward(const half_t* q, const half_t* k, const half_t* v,
     auto tOrS_laytout = make_layout(make_layout(get<0, 0>(l), get<0, 1>(l), get<2, 0>(l)), get<1>(l), get<2, 1>(l));
     Tensor tOrS = make_tensor(tCrS_fp16.data(), tOrS_laytout);
 
-	  Tensor tOgVt = thr_mma.partition_B(gVt);
+	Tensor tOgVt = thr_mma.partition_B(gVt);
     Tensor tOrVt = thr_mma.partition_fragment_B(gVt);
     cute::copy(tOgVt, tOrVt);
 
@@ -180,8 +181,13 @@ __global__ void flash_forward(const half_t* q, const half_t* k, const half_t* v,
 
     cute::gemm(mma, tOrS, tOrVt, tOrO_intra);
 
-    // 计算 o_inter = q @ kv -> BLOCK x d @ d x d = BLOCK x d
+    // output debug info
+    Tensor O_intra = make_tensor(make_gmem_ptr<float>(o_intra_out + block_id * BLOCK * kHeadDim),
+                             make_shape(Int<BLOCK>{}, Int<kHeadDim>{}), make_stride(Int<kHeadDim>{}, Int<1>{})); // d x d
+    Tensor gO_intra = thr_mma.partition_C(O_intra);
+    cute::copy(tOrO_intra, gO_intra);
 
+    // 计算 o_inter = q @ kv -> BLOCK x d @ d x d = BLOCK x d
     Tensor tCrO_inter = partition_fragment_C(mma, make_shape(Int<BLOCK>{}, Int<kHeadDim>{}));
     cute::clear(tCrO_inter);
 
@@ -194,6 +200,13 @@ __global__ void flash_forward(const half_t* q, const half_t* k, const half_t* v,
 //    }
 
     cute::gemm(mma, tArQ, tBrKVt, tCrO_inter);
+
+    // output debug info
+    Tensor O_inter = make_tensor(make_gmem_ptr<float>(o_inter_out + block_id * BLOCK * kHeadDim),
+                             make_shape(Int<BLOCK>{}, Int<kHeadDim>{}), make_stride(Int<kHeadDim>{}, Int<1>{})); // d x d
+    Tensor gO_inter = thr_mma.partition_C(O_inter);
+    cute::copy(tCrO_inter, gO_inter);
+
 
 //    if (thread0()) {
 //      PRINT_TENSOR("tCrO_inter", tCrO_inter(_, 0, 0));
@@ -239,7 +252,7 @@ __global__ void flash_forward(const half_t* q, const half_t* k, const half_t* v,
 
 
 // q [B, H, N, d] k  [B, H, N, d] v [B, H, N, d]
-std::tuple<torch::Tensor, torch::Tensor> forward_without_decay_precision(torch::Tensor q, torch::Tensor k, torch::Tensor v) {
+std::tuple<torch::Tensor, torch::Tensor, torch::Tensor, torch::Tensor> forward_without_decay_precision(torch::Tensor q, torch::Tensor k, torch::Tensor v) {
   int B = q.size(0);
   int H = q.size(1);
   int N = q.size(2);
@@ -252,6 +265,9 @@ std::tuple<torch::Tensor, torch::Tensor> forward_without_decay_precision(torch::
 
   auto kv_out = torch::zeros({num_block, d, d}, torch::TensorOptions().dtype(torch::kFloat32).device(torch::Device(torch::kCUDA, 0)));
 
+  auto o_inter_out = torch::zeros({num_block, BLOCK, d}, torch::TensorOptions().dtype(torch::kFloat32).device(torch::Device(torch::kCUDA, 0)));
+  auto o_intra_out = torch::zeros({num_block, BLOCK, d}, torch::TensorOptions().dtype(torch::kFloat32).device(torch::Device(torch::kCUDA, 0)));
+
   auto out = torch::empty_like(q);
 
   // only for head_dim=64
@@ -263,8 +279,9 @@ std::tuple<torch::Tensor, torch::Tensor> forward_without_decay_precision(torch::
   PRINT("block", block);
 
   partition_kernel<<<grid, block>>>((cute::half_t*)q.data_ptr(), (cute::half_t*)k.data_ptr(),
-                                              (cute::half_t*)v.data_ptr(), (cute::half_t*)out.data_ptr(), B, H, N, (float*)kv_out.data_ptr());
+                                              (cute::half_t*)v.data_ptr(), (cute::half_t*)out.data_ptr(), B, H, N, (float*)kv_out.data_ptr(),
+                                    (float*)o_inter_out.data_ptr(), (float*)o_intra_out.data_ptr());
 
   cudaDeviceSynchronize();
-  return std::make_tuple(out, kv_out);
+  return std::make_tuple(out, kv_out, o_inter_out, o_intra_out);
 }

@@ -72,6 +72,11 @@ def lightning_attn_no_decay(
     # kv = torch.zeros(B, H, d, d).to(torch.float32).to(q.device)
     kv = torch.zeros(B, H, d, d).to(torch.float32).to(q.device)
     kv_output = torch.zeros(NUM_BLOCK, d, d).to(kv.dtype).to(q.device)
+
+    o_inter_output = torch.zeros(NUM_BLOCK, BLOCK, d).to(torch.float32).to(q.device)
+    o_intra_output = torch.zeros(NUM_BLOCK, BLOCK, d).to(torch.float32).to(q.device)
+
+
     output = torch.empty((B, H, N, d), dtype=torch.float16, device=q.device)
     for i in range(NUM_BLOCK):
         si = i * BLOCK
@@ -81,11 +86,14 @@ def lightning_attn_no_decay(
         vi = v[:, :, si:ei, :].contiguous().to(torch.float32)
 
         qkv_none_diag = torch.matmul(qi, kv.to(qi.dtype))
+        o_inter_output[i] = qkv_none_diag.detach().clone()
 
         # diag
         qk = torch.matmul(qi, ki.transpose(-1, -2))
 
         qkv_diag = torch.matmul(qk, vi)
+        o_intra_output[i] = qkv_diag.detach().clone()
+
         output[:, :, si:ei] = (qkv_none_diag + qkv_diag).to(torch.float16)
         # new_kv = torch.matmul(ki.transpose(-1, -2).to(vi.dtype), vi).to(torch.float32)
         new_kv = torch.matmul(ki.transpose(-1, -2).to(vi.dtype), vi)
@@ -95,7 +103,7 @@ def lightning_attn_no_decay(
         print(f"data types. qi : {qi.dtype}, ki : {ki.dtype}, vi : {vi.dtype}, qkv_none_diag : {qkv_none_diag.dtype}, qk : {qk.dtype}, qkv_diag: {qkv_diag.dtype}, "
               f"output: {output.dtype}, new_kv: {new_kv.dtype}")
 
-    return output, kv_output
+    return output, kv_output, o_inter_output, o_intra_output
 
 
 def set_seed(seed=42):
@@ -142,8 +150,8 @@ def test_forward_without_decay(q, k, v):
 
 
 def test_forward_without_decay_precision(q, k, v):
-    torch_output, torch_kv_output = lightning_attn_no_decay(q, k, v)
-    cute_output, cute_kv_output = myflash.forward_without_decay_precision(q, k, v)
+    torch_output, torch_kv_output, torch_o_inter_out, torch_o_intra_out = lightning_attn_no_decay(q, k, v)
+    cute_output, cute_kv_output, cute_o_inter_out, cute_o_intra_out = myflash.forward_without_decay_precision(q, k, v)
 
     BLOCK = 64
     B, H, N, d = q.shape
@@ -162,6 +170,31 @@ def test_forward_without_decay_precision(q, k, v):
             msg=f"block : {i}, KV results are different",
         )
     print("✅ kv results match")
+
+    for i in range(num_block):
+        print(f"torch_o_inter_out shape: {torch_o_inter_out[i].shape}")
+        print(f"cute_o_inter_out shape: {cute_o_inter_out[i].shape}")
+        torch.testing.assert_close(
+            torch_o_inter_out[i],
+            cute_o_inter_out[i],
+            # rtol=1e-3,
+            # atol=1e-2,
+            msg=f"block : {i},  o inter results are different",
+        )
+    print("✅ o inter result matches")
+
+
+    for i in range(num_block):
+        print(f"torch_o_intra_out shape: {torch_o_intra_out[i].shape}")
+        print(f"cute_o_intra_out shape: {cute_o_intra_out[i].shape}")
+        torch.testing.assert_close(
+            torch_o_intra_out[i],
+            cute_o_intra_out[i],
+            # rtol=1e-3,
+            # atol=1e-2,
+            msg=f"block : {i}, KV results are different",
+        )
+    print("✅ o intra result maches")
 
     for i in range(num_block):
         b_torch_output = torch_output[:, :, i * BLOCK : (i + 1) * BLOCK]
