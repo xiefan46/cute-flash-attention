@@ -172,6 +172,18 @@ def test_forward_without_decay_precision(q, k, v):
     print("✅ kv results match")
 
     for i in range(num_block):
+        print(f"torch_o_intra_out shape: {torch_o_intra_out[i].shape}")
+        print(f"cute_o_intra_out shape: {cute_o_intra_out[i].shape}")
+        torch.testing.assert_close(
+            torch_o_intra_out[i],
+            cute_o_intra_out[i],
+            # rtol=1e-3,
+            # atol=1e-2,
+            msg=f"block : {i}, o_intra results are different.torch_o_intra_out: {torch_o_intra_out[i]}, cute_o_intra_out: {cute_o_intra_out[i]}",
+        )
+    print("✅ o intra result maches")
+
+    for i in range(num_block):
         print(f"torch_o_inter_out shape: {torch_o_inter_out[i].shape}")
         print(f"cute_o_inter_out shape: {cute_o_inter_out[i].shape}")
         torch.testing.assert_close(
@@ -184,17 +196,7 @@ def test_forward_without_decay_precision(q, k, v):
     print("✅ o inter result matches")
 
 
-    for i in range(num_block):
-        print(f"torch_o_intra_out shape: {torch_o_intra_out[i].shape}")
-        print(f"cute_o_intra_out shape: {cute_o_intra_out[i].shape}")
-        torch.testing.assert_close(
-            torch_o_intra_out[i],
-            cute_o_intra_out[i],
-            # rtol=1e-3,
-            # atol=1e-2,
-            msg=f"block : {i}, o_intra results are different.torch_o_intra_out: {torch_o_intra_out[i]}, cute_o_intra_out: {cute_o_intra_out[i]}",
-        )
-    print("✅ o intra result maches")
+
 
     for i in range(num_block):
         b_torch_output = torch_output[:, :, i * BLOCK : (i + 1) * BLOCK]
