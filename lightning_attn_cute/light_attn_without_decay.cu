@@ -94,7 +94,7 @@ __forceinline__ __device__ auto fp32_to_fp16(Tensor& src_fp32) {
 // 3. gmem到smem的copy似乎没有流水线
 // 4. 给smem增加static check. 参考 https://github.com/NVIDIA/cutlass/blob/main/media/docs/cute/0x_gemm_tutorial.md
 template <typename config>
-__global__ void flash_forward(const half_t* q, const half_t* k, const half_t* v, half_t* o, const int B, const int H, const int N) {
+__global__ void flash_forward(const half_t* q, const half_t* k, const half_t* v, half_t* o, const int B, const int H, const int N/*, half_t* o_kv*/) {
   using namespace cute;
   using TiledMMA = typename config::TiledMMA;
 
@@ -108,7 +108,7 @@ __global__ void flash_forward(const half_t* q, const half_t* k, const half_t* v,
   const int bs_head_offset = bx * N * kHeadDim;
   const int num_block = (N + BLOCK - 1) / BLOCK;
 
-  __shared__ float smem_kv[kHeadDim * kHeadDim];
+  __shared__ half smem_kv[kHeadDim * kHeadDim];
 //  for (int i = tx; i < kHeadDim * kHeadDim; i += blockDim.x) {
 //    smem_kv[i] = __float2half(0.0f);
 //  }
@@ -219,6 +219,9 @@ __global__ void flash_forward(const half_t* q, const half_t* k, const half_t* v,
     cute::gemm(mma, tArKt, tBrVt, tCrNewKV);
     cute::axpby(1.0, fp32_to_fp16(tCrNewKV), 1.0, tCsKV);
   }
+
+
+  // Tensor OKV = make_tensor(make_gmem_ptr<half_t>(o_kv + bs_head_offset), make_shape(Int<kHeadDim>{}, Int<kHeadDim>{}), make_stride(Int<kHeadDim>{}, Int<1>{})); // d x d
 
 }
 
