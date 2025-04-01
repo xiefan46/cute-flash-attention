@@ -145,11 +145,13 @@ def test_forward_without_decay_precision(q, k, v):
     torch_output, torch_kv_output = lightning_attn_no_decay(q, k, v)
     cute_output, cute_kv_output = myflash.forward_without_decay_precision(q, k, v)
 
+    BLOCK = 64
+    B, H, N, d = q.shape
+    num_block = (N + BLOCK - 1) / BLOCK
 
-    print(f"torch_kv_output: {torch_kv_output}")
-    print(f"cute_kv_output: {cute_kv_output}")
+    print(f"num_block : {num_block}")
 
-    for i in range(2):
+    for i in range(num_block):
         print(f"torch_kv_output shape: {torch_kv_output[i].shape}")
         print(f"cute_kv_output shape: {cute_kv_output[i].shape}")
         torch.testing.assert_close(
@@ -160,13 +162,13 @@ def test_forward_without_decay_precision(q, k, v):
             msg=f"block : {i}, KV results are different",
         )
 
-    torch.testing.assert_close(
-        torch_output,
-        cute_output,
-        # rtol=1e-3,
-        # atol=1e-2,
-        msg="Lightning attention implementations produce different results",
-    )
+        torch.testing.assert_close(
+            torch_output[:, :, i * BLOCK : (i + 1) * BLOCK],
+            cute_output[:, :, i * BLOCK : (i + 1) * BLOCK],
+            # rtol=1e-3,
+            # atol=1e-2,
+            msg=f"block: {i}, Lightning attention implementations produce different results",
+        )
 
     print("✅ Two implementations match")
 
