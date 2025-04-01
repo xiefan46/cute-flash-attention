@@ -147,7 +147,7 @@ def test_forward_without_decay_precision(q, k, v):
 
     BLOCK = 64
     B, H, N, d = q.shape
-    num_block = (N + BLOCK - 1) / BLOCK
+    num_block = (N + BLOCK - 1) // BLOCK
 
     print(f"num_block : {num_block}")
 
