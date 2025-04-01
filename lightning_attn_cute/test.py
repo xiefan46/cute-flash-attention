@@ -143,7 +143,7 @@ def test_forward_without_decay(q, k, v):
 
 def test_forward_without_decay_precision(q, k, v):
     torch_output, torch_kv_output = lightning_attn_no_decay(q, k, v)
-    (cute_output, cute_kv_output) = myflash.forward_without_decay_precision(q, k, v)
+    cute_output, cute_kv_output = myflash.forward_without_decay_precision(q, k, v)
 
 
     print(f"torch_kv_output shape: {torch_kv_output.shape}")

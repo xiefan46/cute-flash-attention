@@ -233,9 +233,6 @@ __global__ void flash_forward(const half_t* q, const half_t* k, const half_t* v,
 
   }
 
-
-  // Tensor OKV = make_tensor(make_gmem_ptr<half_t>(o_kv + bs_head_offset), make_shape(Int<kHeadDim>{}, Int<kHeadDim>{}), make_stride(Int<kHeadDim>{}, Int<1>{})); // d x d
-
 }
 
 
@@ -250,6 +247,8 @@ std::tuple<torch::Tensor, torch::Tensor> forward_without_decay_precision(torch::
 
   int BLOCK = 64;
   int num_block = (N + BLOCK - 1) / BLOCK;
+
+  PRINT("num_block", num_block);
 
   auto kv_out = torch::zeros({num_block, d, d}, torch::TensorOptions().dtype(torch::kFloat32).device(torch::Device(torch::kCUDA, 0)));
 
