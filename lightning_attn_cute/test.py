@@ -152,6 +152,7 @@ N = 128
 # NOTE: we only support d = 64!
 d = 64
 
+
 q = torch.randn(B, N, H, d).cuda().half()
 k = torch.randn(B, N, H, d).cuda().half()
 v = torch.randn(B, N, H, d).cuda().half()

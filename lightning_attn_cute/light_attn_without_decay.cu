@@ -94,7 +94,7 @@ __forceinline__ __device__ auto fp32_to_fp16(Tensor& src_fp32) {
 // 3. gmem到smem的copy似乎没有流水线
 // 4. 给smem增加static check. 参考 https://github.com/NVIDIA/cutlass/blob/main/media/docs/cute/0x_gemm_tutorial.md
 template <typename config>
-__global__ void flash_forward(const half_t* q, const half_t* k, const half_t* v, half_t* o, const int B, const int H, const int N/*, half_t* o_kv*/) {
+__global__ void flash_forward(const half_t* q, const half_t* k, const half_t* v, half_t* o, const int B, const int H, const int N) {
   using namespace cute;
   using TiledMMA = typename config::TiledMMA;
 
@@ -234,6 +234,11 @@ torch::Tensor forward_without_decay(torch::Tensor q, torch::Tensor k, torch::Ten
   int H = q.size(1);
   int N = q.size(2);
   int d = q.size(3);
+
+  int BLOCK = 64;
+  int num_block = (N + BLOCK - 1) / BLOCK;
+
+  auto kv_out = torch.zeros((num_block, d, d), device=q.device, dtype=q.dtype)
 
   auto out = torch::empty_like(q);
 
