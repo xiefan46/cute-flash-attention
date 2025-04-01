@@ -108,11 +108,16 @@ __global__ void flash_forward(const half_t* q, const half_t* k, const half_t* v,
   const int bs_head_offset = bx * N * kHeadDim;
   const int num_block = (N + BLOCK - 1) / BLOCK;
 
+  __shared__ half_t smem_kv[kHeadDim][kHeadDim];
+
   Tensor Q = make_tensor(make_gmem_ptr<half_t>(q + bs_head_offset), make_shape(N, Int<kHeadDim>{}), make_stride(Int<kHeadDim>{}, Int<1>{})); // N x d
   Tensor K = make_tensor(make_gmem_ptr<half_t>(k + bs_head_offset), make_shape(N, Int<kHeadDim>{}), make_stride(Int<kHeadDim>{}, Int<1>{})); // N x d
   Tensor Kt = make_tensor(make_gmem_ptr<half_t>(k + bs_head_offset), make_shape(Int<kHeadDim>{}, N), make_stride(Int<1>{}, Int<kHeadDim>{})); // d x N
   Tensor Vt = make_tensor(make_gmem_ptr<half_t>(v + bs_head_offset), make_shape(Int<kHeadDim>{}, N), make_stride(Int<1>{}, Int<kHeadDim>{})); // d x N
   Tensor O = make_tensor(make_gmem_ptr<half_t>(o + bs_head_offset), make_shape(N, Int<kHeadDim>{}), make_stride(Int<kHeadDim>{}, Int<1>{})); // N x d
+
+  Tensor sKV = make_tensor(make_smem_ptr<half_t>(&smem_kv), make_shape(Int<kHeadDim>{}, Int<kHeadDim>{}), make_stride(Int<kHeadDim>{},Int<1>{}));
+  Tensor sKVt = make_tensor(make_smem_ptr<half_t>(&smem_kv), make_shape(Int<kHeadDim>{}, Int<kHeadDim>{}), make_stride(Int<1>{}, Int<kHeadDim>{}));
 
 
   TiledMMA mma;
@@ -171,17 +176,12 @@ __global__ void flash_forward(const half_t* q, const half_t* k, const half_t* v,
     Tensor tCrO_inter = partition_fragment_C(mma, make_shape(Int<BLOCK>{}, Int<kHeadDim>{}));
     cute::clear(tCrO_inter);
 
-    auto tCrKV_fp16 = fp32_to_fp16(tCrKV);
 
-    auto l2 = tCrKV_fp16.layout();
-    auto tBrKV_fp16 = make_tensor(tCrKV_fp16.data(), make_layout(get<0>(l2), get<2>(l2), get<1>(l2)));
+    Tensor tBsKVt = thr_mma.partition_B(sKVt);
+    Tensor tBrKVt = thr_mma.partition_fragment_B(sKVt);
+    cute::copy(tBsKVt, tBrKVt);
 
-    if (thread0()) {
-      PRINT_TENSOR("tCrKV", tCrKV(_, 0, 0))
-      PRINT_TENSOR("tBrKV_fp16", tBrKV_fp16(_, 0, 0));
-    }
-
-    cute::gemm(mma, tArQ, tBrKV_fp16, tCrO_inter);
+    cute::gemm(mma, tArQ, tBrKVt, tCrO_inter);
 
     if (thread0()) {
       PRINT_TENSOR("tCrO_inter", tCrO_inter(_, 0, 0));
@@ -205,20 +205,11 @@ __global__ void flash_forward(const half_t* q, const half_t* k, const half_t* v,
     cute::copy(tAgKt, tArKt);
     cute::copy(tBgVt, tBrVt);
 
-    Tensor tCrNewKV = partition_fragment_C(mma, make_shape(Int<kHeadDim>{}, Int<kHeadDim>{}));
+    Tensor tCrNewKV = thr_mma.partition_fragment_C(sKV);
+    Tensor tCsKV = thr_mma.partition_C(sKV);
     clear(tCrNewKV);
-
     cute::gemm(mma, tArKt, tBrVt, tCrNewKV);
-
-
-//    if (thread0()) {
-//      PRINT_TENSOR("tCrKV", tCrKV(_, 0, 0));
-//      PRINT_TENSOR("tCrNewKV", tCrNewKV(_, 0, 0));
-//    }
-
-    cute::axpby(1.0, tCrNewKV, 1.0, tCrKV);
-
-
+    cute::axpby(1.0, fp32_to_fp16(tCrNewKV), 1.0, tCsKV);
   }
 
 }
