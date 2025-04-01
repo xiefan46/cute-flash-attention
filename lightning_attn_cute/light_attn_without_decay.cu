@@ -238,7 +238,7 @@ torch::Tensor forward_without_decay(torch::Tensor q, torch::Tensor k, torch::Ten
   int BLOCK = 64;
   int num_block = (N + BLOCK - 1) / BLOCK;
 
-  auto kv_out = torch.zeros((num_block, d, d), device=q.device, dtype=q.dtype);
+  // auto kv_out = torch.zeros((num_block, d, d), device=q.device, dtype=q.dtype);
 
   auto out = torch::empty_like(q);
 
