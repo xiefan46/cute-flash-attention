@@ -154,15 +154,14 @@ def test_forward_without_decay_precision(q, k, v):
     print(f"torch_kv_output: {torch_kv_output}")
     print(f"cute_kv_output: {cute_kv_output}")
 
-
-
-    torch.testing.assert_close(
-        torch_kv_output,
-        cute_kv_output,
-        # rtol=1e-3,
-        # atol=1e-2,
-        msg="KV results are different",
-    )
+    for i in range(2):
+        torch.testing.assert_close(
+            torch_kv_output[i],
+            cute_kv_output[i],
+            # rtol=1e-3,
+            # atol=1e-2,
+            msg=f"block : {i}, KV results are different",
+        )
 
     torch.testing.assert_close(
         torch_output,
