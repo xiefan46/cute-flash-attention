@@ -62,6 +62,34 @@ def manual_attn_no_normal(q, k, v, attn_mask=None, use_softmax = True):
     y = att @ v
     return y
 
+
+def lightning_attn_no_decay(
+        q, k, v, BLOCK = 64
+) -> torch.Tensor:
+    B, H, N, d = q.shape
+    NUM_BLOCK = (N + BLOCK - 1) // BLOCK
+    kv = torch.zeros(B, H, d, d).to(torch.float32).to(q.device)
+    output = torch.empty((B, H, N, d), dtype=q.dtype, device=q.device)
+    for i in range(NUM_BLOCK):
+        si = i * BLOCK
+        ei = min(si + BLOCK, N)
+        qi = q[:, :, si:ei].contiguous()
+        ki = k[:, :, si:ei].contiguous()
+        vi = v[:, :, si:ei].contiguous()
+        qkv_none_diag = torch.matmul(qi, kv).to(torch.float32)
+
+        # diag
+        qk = (
+                torch.matmul(qi, ki.transpose(-1, -2)).to(torch.float32)
+        )
+        qkv_diag = torch.matmul(qk, vi.to(torch.float32))
+        output[:, :, si:ei] = qkv_none_diag + qkv_diag
+        kv = kv + torch.matmul(
+            ki.transpose(-1, -2).to(vi.dtype), vi
+        )
+    return output
+
+
 def set_seed(seed=42):
     # Python 随机模块
     random.seed(seed)
@@ -88,8 +116,21 @@ def set_seed(seed=42):
 
 
 def test_forward_without_decay(q, k, v):
-    b = myflash.forward_without_decay(q, k, v)
-    print(f"b : {b}")
+    torch_output = lightning_attn_no_decay(q, k, v)
+    cute_output = myflash.forward_without_decay(q, k, v)
+
+    print(f"torch output: {torch_output}")
+    print(f"cute_output: {cute_output}")
+    
+    torch.testing.assert_close(
+        torch_output,
+        cute_output,
+        rtol=1e-3,
+        atol=1e-2,
+        msg="Lightning attention implementations produce different results",
+    )
+
+    print("✅ Two implementations match")
 
 # index = block_off[:, None] - block_off[None, :]  # 相对位置 BLOCK x BLOCK
 # s_index = -slope * index  # BLOCK * BLOCK
