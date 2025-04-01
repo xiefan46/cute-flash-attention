@@ -108,7 +108,7 @@ __global__ void flash_forward(const half_t* q, const half_t* k, const half_t* v,
   const int bs_head_offset = bx * N * kHeadDim;
   const int num_block = (N + BLOCK - 1) / BLOCK;
 
-  __shared__ half_t smem_kv[kHeadDim][kHeadDim];
+  __shared__ half_t smem_kv[kHeadDim * kHeadDim];
 
   Tensor Q = make_tensor(make_gmem_ptr<half_t>(q + bs_head_offset), make_shape(N, Int<kHeadDim>{}), make_stride(Int<kHeadDim>{}, Int<1>{})); // N x d
   Tensor K = make_tensor(make_gmem_ptr<half_t>(k + bs_head_offset), make_shape(N, Int<kHeadDim>{}), make_stride(Int<kHeadDim>{}, Int<1>{})); // N x d
@@ -128,8 +128,6 @@ __global__ void flash_forward(const half_t* q, const half_t* k, const half_t* v,
     PRINT("num_block", num_block);
   }
 
-  Tensor tCrKV = partition_fragment_C(mma, make_shape(Int<kHeadDim>{}, Int<kHeadDim>{})); //d x d
-  clear(tCrKV);
   for (int block_id = 0; block_id < num_block; block_id++) {
     Tensor gQ = local_tile(Q, make_tile(Int<BLOCK>{}, Int<kHeadDim>{}), make_coord(block_id, 0)); //BLOCK x d
     Tensor gK = local_tile(K, make_tile(Int<BLOCK>{}, Int<kHeadDim>{}), make_coord(block_id, 0)); //BLOCK x d
@@ -183,9 +181,9 @@ __global__ void flash_forward(const half_t* q, const half_t* k, const half_t* v,
 
     cute::gemm(mma, tArQ, tBrKVt, tCrO_inter);
 
-    if (thread0()) {
-      PRINT_TENSOR("tCrO_inter", tCrO_inter(_, 0, 0));
-    }
+//    if (thread0()) {
+//      PRINT_TENSOR("tCrO_inter", tCrO_inter(_, 0, 0));
+//    }
 
     // O = O_intra + O_inter
     cute::axpby(1.0, tOrO_intra, 1.0, tCrO_inter);
