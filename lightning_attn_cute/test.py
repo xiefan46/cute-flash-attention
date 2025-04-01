@@ -76,7 +76,7 @@ def lightning_attn_no_decay(
         qi = q[:, :, si:ei].contiguous()
         ki = k[:, :, si:ei].contiguous()
         vi = v[:, :, si:ei].contiguous()
-        qkv_none_diag = torch.matmul(qi, kv).to(torch.float32)
+        qkv_none_diag = torch.matmul(qi, kv.to(qi.dtype)).to(torch.float32)
 
         # diag
         qk = (
@@ -84,9 +84,8 @@ def lightning_attn_no_decay(
         )
         qkv_diag = torch.matmul(qk, vi.to(torch.float32))
         output[:, :, si:ei] = qkv_none_diag + qkv_diag
-        kv = kv + torch.matmul(
-            ki.transpose(-1, -2).to(vi.dtype), vi
-        )
+        new_kv = torch.matmul(ki.transpose(-1, -2).to(vi.dtype), vi).to(torch.float32)
+        kv = kv + new_kv
     return output
 
 
@@ -121,7 +120,7 @@ def test_forward_without_decay(q, k, v):
 
     print(f"torch output: {torch_output}")
     print(f"cute_output: {cute_output}")
-    
+
     torch.testing.assert_close(
         torch_output,
         cute_output,
