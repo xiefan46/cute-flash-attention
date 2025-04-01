@@ -72,7 +72,7 @@ def lightning_attn_no_decay(
     # kv = torch.zeros(B, H, d, d).to(torch.float32).to(q.device)
     kv = torch.zeros(B, H, d, d).to(torch.float32).to(q.device)
     kv_output = torch.zeros(NUM_BLOCK, d, d).to(kv.dtype).to(q.device)
-    output = torch.empty((B, H, N, d), dtype=torch.float32, device=q.device)
+    output = torch.empty((B, H, N, d), dtype=torch.float16, device=q.device)
     for i in range(NUM_BLOCK):
         si = i * BLOCK
         ei = min(si + BLOCK, N)
@@ -86,7 +86,7 @@ def lightning_attn_no_decay(
         qk = torch.matmul(qi, ki.transpose(-1, -2))
 
         qkv_diag = torch.matmul(qk, vi)
-        output[:, :, si:ei] = qkv_none_diag + qkv_diag
+        output[:, :, si:ei] = (qkv_none_diag + qkv_diag).to(torch.float16)
         # new_kv = torch.matmul(ki.transpose(-1, -2).to(vi.dtype), vi).to(torch.float32)
         new_kv = torch.matmul(ki.transpose(-1, -2).to(vi.dtype), vi)
         kv = kv + new_kv
