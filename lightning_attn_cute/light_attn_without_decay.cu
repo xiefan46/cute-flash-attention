@@ -217,7 +217,7 @@ __global__ void flash_forward(const half_t* q, const half_t* k, const half_t* v,
     Tensor tCsKV = thr_mma.partition_C(sKV);
     clear(tCrNewKV);
     cute::gemm(mma, tArKt, tBrVt, tCrNewKV);
-    cute::axpby(1.0, tCrNewKV, 1.0, tCsKV);
+    cute::axpby(1.0, fp32_to_fp16(tCrNewKV), 1.0, tCsKV);
   }
 
 }
