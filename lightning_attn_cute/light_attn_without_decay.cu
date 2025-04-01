@@ -177,14 +177,14 @@ __global__ void flash_forward(const half_t* q, const half_t* k, const half_t* v,
     auto tBrKV_fp16 = make_tensor(tCrKV_fp16.data(), make_layout(get<0>(l2), get<2>(l2), get<1>(l2)));
 
     if (thread0()) {
-      PRINT_TENSOR("tCrKV", tCrKV((_, 0), 0, 0))
-      PRINT_TENSOR("tBrKV_fp16", tBrKV_fp16((_, 0), 0, 0));
+      PRINT_TENSOR("tCrKV", tCrKV(_, 0, 0))
+      PRINT_TENSOR("tBrKV_fp16", tBrKV_fp16(_, 0, 0));
     }
 
     cute::gemm(mma, tArQ, tBrKV_fp16, tCrO_inter);
 
     if (thread0()) {
-      PRINT_TENSOR("tCrO_inter", tCrO_inter((_, 0), 0, 0));
+      PRINT_TENSOR("tCrO_inter", tCrO_inter(_, 0, 0));
     }
 
     // O = O_intra + O_inter
