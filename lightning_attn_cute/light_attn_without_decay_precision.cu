@@ -262,6 +262,7 @@ std::tuple<torch::Tensor, torch::Tensor> forward_without_decay_precision(torch::
   auto partition_kernel = flash_forward<decltype(config)>;
   PRINT("grid", grid);
   PRINT("block", block);
+  PRINT("kv_out cpu", kv_out)
 
   partition_kernel<<<grid, block>>>((cute::half_t*)q.data_ptr(), (cute::half_t*)k.data_ptr(),
                                               (cute::half_t*)v.data_ptr(), (cute::half_t*)out.data_ptr(), B, H, N, (float*)kv_out.data_ptr());
