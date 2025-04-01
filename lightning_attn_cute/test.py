@@ -124,8 +124,8 @@ def test_forward_without_decay(q, k, v):
     torch_output = lightning_attn_no_decay(q, k, v)
     cute_output = myflash.forward_without_decay(q, k, v)
 
-    print(f"torch output: {torch_output}")
-    print(f"cute_output: {cute_output}")
+    # print(f"torch output: {torch_output}")
+    # print(f"cute_output: {cute_output}")
 
     torch.testing.assert_close(
         torch_output,
