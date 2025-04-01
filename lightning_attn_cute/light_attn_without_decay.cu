@@ -114,8 +114,6 @@ __global__ void flash_forward(const half_t* q, const half_t* k, const half_t* v,
 //  }
 //  __syncthreads();
 
-
-
   Tensor Q = make_tensor(make_gmem_ptr<half_t>(q + bs_head_offset), make_shape(N, Int<kHeadDim>{}), make_stride(Int<kHeadDim>{}, Int<1>{})); // N x d
   Tensor K = make_tensor(make_gmem_ptr<half_t>(k + bs_head_offset), make_shape(N, Int<kHeadDim>{}), make_stride(Int<kHeadDim>{}, Int<1>{})); // N x d
   Tensor Kt = make_tensor(make_gmem_ptr<half_t>(k + bs_head_offset), make_shape(Int<kHeadDim>{}, N), make_stride(Int<1>{}, Int<kHeadDim>{})); // d x N
@@ -128,6 +126,9 @@ __global__ void flash_forward(const half_t* q, const half_t* k, const half_t* v,
 
   TiledMMA mma;
   ThrMMA thr_mma = mma.get_slice(tx);
+
+  Tensor tBsKVt = thr_mma.partition_B(sKVt);
+  clear(tBsKVt);
 
   if (thread0()) {
     PRINT("mma size", size(mma));
@@ -180,8 +181,6 @@ __global__ void flash_forward(const half_t* q, const half_t* k, const half_t* v,
     Tensor tCrO_inter = partition_fragment_C(mma, make_shape(Int<BLOCK>{}, Int<kHeadDim>{}));
     cute::clear(tCrO_inter);
 
-
-    Tensor tBsKVt = thr_mma.partition_B(sKVt);
     Tensor tBrKVt = thr_mma.partition_fragment_B(sKVt);
     cute::copy(tBsKVt, tBrKVt);
 
