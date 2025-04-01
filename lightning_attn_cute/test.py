@@ -152,7 +152,6 @@ def test_forward_without_decay_precision(q, k, v):
     print(f"num_block : {num_block}")
 
     for i in range(num_block):
-
         print(f"torch_kv_output shape: {torch_kv_output[i].shape}")
         print(f"cute_kv_output shape: {cute_kv_output[i].shape}")
         torch.testing.assert_close(
@@ -162,8 +161,9 @@ def test_forward_without_decay_precision(q, k, v):
             # atol=1e-2,
             msg=f"block : {i}, KV results are different",
         )
+    print("✅ kv results match")
 
-
+    for i in range(num_block):
         b_torch_output = torch_output[:, :, i * BLOCK : (i + 1) * BLOCK]
         b_cute_output =  cute_output[:, :, i * BLOCK : (i + 1) * BLOCK]
 
