@@ -179,7 +179,7 @@ def test_forward_without_decay_precision(q, k, v):
             cute_o_inter_out[i],
             # rtol=1e-3,
             # atol=1e-2,
-            msg=f"block : {i},  o inter results are different",
+            msg=f"block : {i},  o inter results are different. torch_o_inter_out: {torch_o_inter_out[i]}, cute_o_inter_out: {cute_o_inter_out[i]}",
         )
     print("✅ o inter result matches")
 
@@ -192,7 +192,7 @@ def test_forward_without_decay_precision(q, k, v):
             cute_o_intra_out[i],
             # rtol=1e-3,
             # atol=1e-2,
-            msg=f"block : {i}, KV results are different",
+            msg=f"block : {i}, o_intra results are different.torch_o_intra_out: {torch_o_intra_out[i]}, cute_o_intra_out: {cute_o_intra_out[i]}",
         )
     print("✅ o intra result maches")
 
