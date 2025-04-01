@@ -30,6 +30,7 @@ myflash = load(name='myflash',
                     sources=[
                         'main.cpp',
                         'light_attn_without_decay.cu',
+                        'light_attn_without_decay_precision.cu',
                     ], 
                     extra_cuda_cflags=[
                         '-O2', 
@@ -70,6 +71,7 @@ def lightning_attn_no_decay(
     NUM_BLOCK = (N + BLOCK - 1) // BLOCK
     # kv = torch.zeros(B, H, d, d).to(torch.float32).to(q.device)
     kv = torch.zeros(B, H, d, d).to(q.dtype).to(q.device)
+    kv_output = torch.zeros(NUM_BLOCK, d, d).to(q.dtype).to(q.device)
     output = torch.empty((B, H, N, d), dtype=q.dtype, device=q.device)
     for i in range(NUM_BLOCK):
         si = i * BLOCK
@@ -92,7 +94,8 @@ def lightning_attn_no_decay(
         # new_kv = torch.matmul(ki.transpose(-1, -2).to(vi.dtype), vi).to(torch.float32)
         new_kv = torch.matmul(ki.transpose(-1, -2).to(vi.dtype), vi)
         kv = kv + new_kv
-    return output
+        kv_output[i] = kv.detach().clone()
+    return output, kv_output
 
 
 def set_seed(seed=42):
@@ -136,6 +139,33 @@ def test_forward_without_decay(q, k, v):
     )
 
     print("✅ Two implementations match")
+
+
+def test_forward_without_decay_precision(q, k, v):
+    torch_output, torch_kv_output = lightning_attn_no_decay(q, k, v)
+    cute_output, cute_kv_output = myflash.forward_without_decay_precision(q, k, v)
+
+    print(f"torch_kv_output: {torch_kv_output}")
+    print(f"cute_kv_output: {cute_kv_output}")
+
+    torch.testing.assert_close(
+        torch_kv_output,
+        cute_kv_output,
+        # rtol=1e-3,
+        # atol=1e-2,
+        msg="Lightning attention implementations produce different results",
+    )
+
+    torch.testing.assert_close(
+        torch_output,
+        cute_output,
+        # rtol=1e-3,
+        # atol=1e-2,
+        msg="Lightning attention implementations produce different results",
+    )
+
+    print("✅ Two implementations match")
+
 
 # index = block_off[:, None] - block_off[None, :]  # 相对位置 BLOCK x BLOCK
 # s_index = -slope * index  # BLOCK * BLOCK
