@@ -108,7 +108,7 @@ __global__ void flash_forward(const half_t* q, const half_t* k, const half_t* v,
   const int bs_head_offset = bx * N * kHeadDim;
   const int num_block = (N + BLOCK - 1) / BLOCK;
 
-  __shared__ half_t smem_kv[kHeadDim * kHeadDim];
+  __shared__ float smem_kv[kHeadDim * kHeadDim];
 //  for (int i = tx; i < kHeadDim * kHeadDim; i += blockDim.x) {
 //    smem_kv[i] = __float2half(0.0f);
 //  }
@@ -120,8 +120,8 @@ __global__ void flash_forward(const half_t* q, const half_t* k, const half_t* v,
   Tensor Vt = make_tensor(make_gmem_ptr<half_t>(v + bs_head_offset), make_shape(Int<kHeadDim>{}, N), make_stride(Int<1>{}, Int<kHeadDim>{})); // d x N
   Tensor O = make_tensor(make_gmem_ptr<half_t>(o + bs_head_offset), make_shape(N, Int<kHeadDim>{}), make_stride(Int<kHeadDim>{}, Int<1>{})); // N x d
 
-  Tensor sKV = make_tensor(make_smem_ptr<half_t>(&smem_kv), make_shape(Int<kHeadDim>{}, Int<kHeadDim>{}), make_stride(Int<kHeadDim>{},Int<1>{}));
-  Tensor sKVt = make_tensor(make_smem_ptr<half_t>(&smem_kv), make_shape(Int<kHeadDim>{}, Int<kHeadDim>{}), make_stride(Int<1>{}, Int<kHeadDim>{}));
+  Tensor sKV = make_tensor(make_smem_ptr<float>(&smem_kv), make_shape(Int<kHeadDim>{}, Int<kHeadDim>{}), make_stride(Int<kHeadDim>{},Int<1>{}));
+  Tensor sKVt = make_tensor(make_smem_ptr<float>(&smem_kv), make_shape(Int<kHeadDim>{}, Int<kHeadDim>{}), make_stride(Int<1>{}, Int<kHeadDim>{}));
 
 
   TiledMMA mma;
