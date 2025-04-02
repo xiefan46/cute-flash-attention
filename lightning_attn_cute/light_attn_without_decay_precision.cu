@@ -312,6 +312,8 @@ __global__ void compute_kv_kernel(const half_t* k, const half_t* v, float* kv_ou
   TiledMMA mma;
   ThrMMA thr_mma = mma.get_slice(tx);
 
+  Tensor tCsKV = thr_mma.partition_C(sKV);
+  clear(tCsKV);
 
   if (thread0()) {
     PRINT("mma size", size(mma));
@@ -338,7 +340,7 @@ __global__ void compute_kv_kernel(const half_t* k, const half_t* v, float* kv_ou
     cute::gemm(mma, tArKt, tBrVt, tCrNewKV);
 
 
-    Tensor tCsKV = thr_mma.partition_C(sKV);
+
     cute::axpby(1.0, tCrNewKV, 1.0, tCsKV);
 
     __syncthreads();
