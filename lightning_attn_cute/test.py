@@ -131,7 +131,7 @@ def torch_compute_kv(k, v, BLOCK = 64):
         ki = k[:, :, si:ei].contiguous().to(torch.float16)
         vi = v[:, :, si:ei].contiguous().to(torch.float16)
 
-        new_kv = torch.matmul(ki.transpose(-1, -2), vi).to(torch.float32)
+        new_kv = torch.matmul(ki.transpose(-1, -2), vi)
         print(f"new_kv type: {new_kv.dtype}")
         kv = kv + new_kv
         kv_output[i] = kv.detach().clone()
@@ -254,7 +254,7 @@ def test_kv_match(k, v, myflash):
     cute_kv_output = myflash.cute_compute_kv(k, v)
 
     BLOCK = 64
-    B, H, N, d = q.shape
+    B, H, N, d = k.shape
     num_block = (N + BLOCK - 1) // BLOCK
 
     print(f"num_block : {num_block}")
@@ -262,6 +262,9 @@ def test_kv_match(k, v, myflash):
     for i in range(num_block):
         print(f"torch_kv_output shape: {torch_kv_output[i].shape}")
         print(f"cute_kv_output shape: {cute_kv_output[i].shape}")
+
+        print(f"block: {i}, torch_kv_output: {torch_kv_output[i]}, cute_kv_output: {cute_kv_output[i]}")
+
         torch.testing.assert_close(
             torch_kv_output[i],
             cute_kv_output[i],
