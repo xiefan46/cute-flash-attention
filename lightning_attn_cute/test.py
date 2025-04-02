@@ -131,8 +131,7 @@ def torch_compute_kv(k, v, BLOCK = 64):
         ki = k[:, :, si:ei].contiguous().to(torch.float16)
         vi = v[:, :, si:ei].contiguous().to(torch.float16)
 
-        new_kv = torch.matmul(ki.transpose(-1, -2), vi)
-        print(f"new_kv type: {new_kv.dtype}")
+        new_kv = torch.matmul(ki.transpose(-1, -2), vi).to(torch.float32)
         kv = kv + new_kv
         kv_output[i] = kv.detach().clone()
         print(f"data types.ki : {ki.dtype}, vi : {vi.dtype},  new_kv: {new_kv.dtype}, kv: {kv.dtype}")
