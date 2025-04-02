@@ -90,9 +90,11 @@ __global__ void compute_kv_kernel_all_f16(const half_t* k, const half_t* v, half
   Tensor tCsKV = thr_mma.partition_C(sKV);
   clear(tCsKV);
 
+
   if (thread0()) {
     PRINT("mma size", size(mma));
     PRINT("num_block", num_block);
+    PRINT("tCsKV", tCsKV);
   }
 
   for (int block_id = 0; block_id < num_block; block_id++) {
