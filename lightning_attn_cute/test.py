@@ -366,12 +366,15 @@ def test_kv_match_f16(k, v, myflash):
 
 def test_kv_match_amp(k, v, myflash):
     # torch_kv_output = torch_compute_kv_f16(k, v)
-    torch_kv_output = torch_compute_amp(k, v)
-    cute_kv_output = myflash.cute_compute_kv(k, v)
+    torch_kv_output_f32 = torch_compute_amp(k, v)
+    cute_kv_output_f32 = myflash.cute_compute_kv(k, v)
 
 
-    assert torch_kv_output.dtype == torch.float32
-    assert cute_kv_output.dtype == torch.float32
+    assert torch_kv_output_f32.dtype == torch.float32
+    assert cute_kv_output_f32.dtype == torch.float32
+
+    torch_kv_output = torch_kv_output_f32.to(torch.float16)
+    cute_kv_output = cute_kv_output_f32.to(torch.float16) 
 
     # cute_kv_output = myflash.cute_compute_kv(k, v).half()
 
