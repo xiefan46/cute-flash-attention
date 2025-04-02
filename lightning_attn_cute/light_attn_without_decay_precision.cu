@@ -159,8 +159,7 @@ __global__ void flash_forward(const half_t* q, const half_t* k, const half_t* v,
     clear(tCrS);
 
 
-	  __syncthreads();
-
+	__syncthreads();
 
     cute::gemm(mma, tArQ, tBrK, tCrS);
 
