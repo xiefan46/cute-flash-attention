@@ -64,6 +64,48 @@ def manual_attn_no_normal(q, k, v, attn_mask=None, use_softmax = True):
     return y
 
 
+# def lightning_attn_no_decay(
+#         q, k, v, BLOCK = 64
+# ) -> torch.Tensor:
+#     B, H, N, d = q.shape
+#     NUM_BLOCK = (N + BLOCK - 1) // BLOCK
+#     # kv = torch.zeros(B, H, d, d).to(torch.float32).to(q.device)
+#     kv = torch.zeros(B, H, d, d).to(torch.float32).to(q.device)
+#     kv_output = torch.zeros(NUM_BLOCK, d, d).to(kv.dtype).to(q.device)
+#
+#     o_inter_output = torch.zeros(NUM_BLOCK, BLOCK, d).to(torch.float32).to(q.device)
+#     o_intra_output = torch.zeros(NUM_BLOCK, BLOCK, d).to(torch.float32).to(q.device)
+#
+#
+#     output = torch.empty((B, H, N, d), dtype=torch.float16, device=q.device)
+#     for i in range(NUM_BLOCK):
+#         si = i * BLOCK
+#         ei = min(si + BLOCK, N)
+#         qi = q[:, :, si:ei, :].contiguous().to(torch.float32)
+#         ki = k[:, :, si:ei, :].contiguous().to(torch.float32)
+#         vi = v[:, :, si:ei, :].contiguous().to(torch.float32)
+#
+#         qkv_none_diag = torch.matmul(qi, kv.to(qi.dtype)).to(torch.float32)
+#         o_inter_output[i] = qkv_none_diag.detach().clone()
+#
+#         # diag
+#         qk = torch.matmul(qi, ki.transpose(-1, -2))
+#
+#         qkv_diag = torch.matmul(qk, vi).to(torch.float32)
+#         o_intra_output[i] = qkv_diag.detach().clone()
+#
+#         output[:, :, si:ei] = (qkv_none_diag + qkv_diag).to(torch.float16)
+#         # new_kv = torch.matmul(ki.transpose(-1, -2).to(vi.dtype), vi).to(torch.float32)
+#         new_kv = torch.matmul(ki.transpose(-1, -2), vi)
+#         kv = kv + new_kv
+#         kv_output[i] = kv.detach().clone()
+#
+#         print(f"data types. qi : {qi.dtype}, ki : {ki.dtype}, vi : {vi.dtype}, qkv_none_diag : {qkv_none_diag.dtype}, qk : {qk.dtype}, qkv_diag: {qkv_diag.dtype}, "
+#               f"output: {output.dtype}, new_kv: {new_kv.dtype}")
+#
+#     return output, kv_output, o_inter_output, o_intra_output
+
+
 def lightning_attn_no_decay(
         q, k, v, BLOCK = 64
 ) -> torch.Tensor:
@@ -75,35 +117,36 @@ def lightning_attn_no_decay(
 
     o_inter_output = torch.zeros(NUM_BLOCK, BLOCK, d).to(torch.float32).to(q.device)
     o_intra_output = torch.zeros(NUM_BLOCK, BLOCK, d).to(torch.float32).to(q.device)
-
-
     output = torch.empty((B, H, N, d), dtype=torch.float16, device=q.device)
+
     for i in range(NUM_BLOCK):
         si = i * BLOCK
         ei = min(si + BLOCK, N)
-        qi = q[:, :, si:ei, :].contiguous().to(torch.float32)
-        ki = k[:, :, si:ei, :].contiguous().to(torch.float32)
-        vi = v[:, :, si:ei, :].contiguous().to(torch.float32)
-
-        qkv_none_diag = torch.matmul(qi, kv.to(qi.dtype)).to(torch.float32)
+        qi = q[:, :, si:ei].contiguous()
+        ki = k[:, :, si:ei].contiguous()
+        vi = v[:, :, si:ei].contiguous()
+        qkv_none_diag = torch.matmul(qi, kv).to(torch.float32)
         o_inter_output[i] = qkv_none_diag.detach().clone()
 
-        # diag
-        qk = torch.matmul(qi, ki.transpose(-1, -2))
 
-        qkv_diag = torch.matmul(qk, vi).to(torch.float32)
+        # diag
+        qk = torch.matmul(qi, ki.transpose(-1, -2)).to(torch.float32)
+
+        qkv_diag = torch.matmul(qk, vi.to(torch.float32))
         o_intra_output[i] = qkv_diag.detach().clone()
 
-        output[:, :, si:ei] = (qkv_none_diag + qkv_diag).to(torch.float16)
-        # new_kv = torch.matmul(ki.transpose(-1, -2).to(vi.dtype), vi).to(torch.float32)
-        new_kv = torch.matmul(ki.transpose(-1, -2), vi)
+
+        output[:, :, si:ei] = qkv_none_diag + qkv_diag
+
+        new_kv = torch.matmul(ki.transpose(-1, -2).to(vi.dtype), vi)
         kv = kv + new_kv
         kv_output[i] = kv.detach().clone()
-
         print(f"data types. qi : {qi.dtype}, ki : {ki.dtype}, vi : {vi.dtype}, qkv_none_diag : {qkv_none_diag.dtype}, qk : {qk.dtype}, qkv_diag: {qkv_diag.dtype}, "
               f"output: {output.dtype}, new_kv: {new_kv.dtype}")
 
+
     return output, kv_output, o_inter_output, o_intra_output
+
 
 
 def set_seed(seed=42):
