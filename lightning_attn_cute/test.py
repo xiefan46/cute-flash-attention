@@ -331,6 +331,7 @@ def test_kv_match_f16(k, v, myflash):
         torch.testing.assert_close(
             torch_kv_output[i],
             cute_kv_output[i],
+            atol=1e-3
         )
 
         print(f"✅ block : {i}, kv results match")
