@@ -358,10 +358,10 @@ __global__ void compute_kv_kernel(const half_t* k, const half_t* v, float* kv_ou
 
 
 torch::Tensor cute_compute_kv(torch::Tensor k, torch::Tensor v) {
-    int B = q.size(0);
-    int H = q.size(1);
-    int N = q.size(2);
-    int d = q.size(3);
+    int B = k.size(0);
+    int H = k.size(1);
+    int N = k.size(2);
+    int d = k.size(3);
 
     int BLOCK = 64;
     int num_block = (N + BLOCK - 1) / BLOCK;
