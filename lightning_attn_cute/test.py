@@ -210,7 +210,7 @@ def test_forward_without_decay_precision(q, k, v):
             cute_kv_output[i],
             # rtol=1e-3,
             # atol=1e-2,
-            msg=f"block : {i}, KV results are different",
+            msg=f"block : {i}, KV results are different.torch_kv_output: {torch_kv_output[i]}. cute_kv_output: {cute_kv_output[i]}",
         )
     print("✅ kv results match")
 
