@@ -125,21 +125,21 @@ def lightning_attn_no_decay(
         qi = q[:, :, si:ei].contiguous()
         ki = k[:, :, si:ei].contiguous()
         vi = v[:, :, si:ei].contiguous()
-        qkv_none_diag = torch.matmul(qi, kv.to(torch.float16)).to(torch.float32)
+        qkv_none_diag = torch.matmul(qi, kv.to(torch.float16))
         o_inter_output[i] = qkv_none_diag.detach().clone()
 
 
         # diag
-        qk = torch.matmul(qi, ki.transpose(-1, -2)).to(torch.float32)
+        qk = torch.matmul(qi, ki.transpose(-1, -2))
 
-        qkv_diag = torch.matmul(qk, vi.to(torch.float32))
+        qkv_diag = torch.matmul(qk, vi)
         o_intra_output[i] = qkv_diag.detach().clone()
 
 
         output[:, :, si:ei] = qkv_none_diag + qkv_diag
 
         new_kv = torch.matmul(ki.transpose(-1, -2).to(vi.dtype), vi)
-        kv = kv + new_kv
+        kv = kv + new_kv.to(torch.float32)
         kv_output[i] = kv.detach().clone()
         print(f"data types. qi : {qi.dtype}, ki : {ki.dtype}, vi : {vi.dtype}, qkv_none_diag : {qkv_none_diag.dtype}, qk : {qk.dtype}, qkv_diag: {qkv_diag.dtype}, "
               f"output: {output.dtype}, new_kv: {new_kv.dtype}")
