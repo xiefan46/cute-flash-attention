@@ -303,8 +303,8 @@ def test_kv_match(k, v, myflash):
 
 def test_kv_match_f16(k, v, myflash):
     torch_kv_output = torch_compute_kv_f16(k, v)
-    # cute_kv_output = myflash.cute_compute_kv_all_f16(k, v)
-    cute_kv_output = myflash.cute_compute_kv(k, v).half()
+    cute_kv_output = myflash.cute_compute_kv_all_f16(k, v)
+    # cute_kv_output = myflash.cute_compute_kv(k, v).half()
 
     print(f"torch_kv_output dtype: {torch_kv_output.dtype}, cute_kv_output dtype: {cute_kv_output.dtype}")
 
@@ -331,7 +331,6 @@ def test_kv_match_f16(k, v, myflash):
         torch.testing.assert_close(
             torch_kv_output[i],
             cute_kv_output[i],
-            atol=1e-3
         )
 
         print(f"✅ block : {i}, kv results match")
