@@ -257,7 +257,7 @@ def test_kv_match(k, v, myflash):
     B, H, N, d = k.shape
     num_block = (N + BLOCK - 1) // BLOCK
 
-    print(f"num_block : {num_block}")
+    print(f"test_kv_match. num_block : {num_block}")
 
     for i in range(num_block):
         print(f"torch_kv_output shape: {torch_kv_output[i].shape}")
