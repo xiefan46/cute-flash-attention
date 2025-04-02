@@ -78,7 +78,7 @@ __global__ void compute_kv_kernel_all_f16(const half_t* k, const half_t* v, half
   const int bs_head_offset = bx * N * kHeadDim;
   const int num_block = (N + BLOCK - 1) / BLOCK;
 
-  __shared__ half smem_kv[kHeadDim * kHeadDim];
+  __shared__ half_t smem_kv[kHeadDim * kHeadDim];
   Tensor Kt = make_tensor(make_gmem_ptr<half_t>(k + bs_head_offset), make_shape(Int<kHeadDim>{}, N), make_stride(Int<1>{}, Int<kHeadDim>{})); // d x N
   Tensor Vt = make_tensor(make_gmem_ptr<half_t>(v + bs_head_offset), make_shape(Int<kHeadDim>{}, N), make_stride(Int<1>{}, Int<kHeadDim>{})); // d x N
 
