@@ -304,20 +304,14 @@ __global__ void compute_kv_kernel(const half_t* k, const half_t* v, float* kv_ou
   const int num_block = (N + BLOCK - 1) / BLOCK;
 
   __shared__ float smem_kv[kHeadDim * kHeadDim];
-
-  Tensor K = make_tensor(make_gmem_ptr<half_t>(k + bs_head_offset), make_shape(N, Int<kHeadDim>{}), make_stride(Int<kHeadDim>{}, Int<1>{})); // N x d
   Tensor Kt = make_tensor(make_gmem_ptr<half_t>(k + bs_head_offset), make_shape(Int<kHeadDim>{}, N), make_stride(Int<1>{}, Int<kHeadDim>{})); // d x N
   Tensor Vt = make_tensor(make_gmem_ptr<half_t>(v + bs_head_offset), make_shape(Int<kHeadDim>{}, N), make_stride(Int<1>{}, Int<kHeadDim>{})); // d x N
 
   Tensor sKV = make_tensor(make_smem_ptr<float>(&smem_kv), make_shape(Int<kHeadDim>{}, Int<kHeadDim>{}), make_stride(Int<kHeadDim>{},Int<1>{}));
-  Tensor sKVt = make_tensor(make_smem_ptr<float>(&smem_kv), make_shape(Int<kHeadDim>{}, Int<kHeadDim>{}), make_stride(Int<1>{}, Int<kHeadDim>{}));
-
 
   TiledMMA mma;
   ThrMMA thr_mma = mma.get_slice(tx);
 
-  Tensor tBsKVt = thr_mma.partition_B(sKVt);
-  clear(tBsKVt);
 
   if (thread0()) {
     PRINT("mma size", size(mma));
@@ -340,10 +334,14 @@ __global__ void compute_kv_kernel(const half_t* k, const half_t* v, float* kv_ou
     cute::copy(tBgVt, tBrVt);
 
     Tensor tCrNewKV = thr_mma.partition_fragment_C(sKV);
-    Tensor tCsKV = thr_mma.partition_C(sKV);
     clear(tCrNewKV);
     cute::gemm(mma, tArKt, tBrVt, tCrNewKV);
+
+
+    Tensor tCsKV = thr_mma.partition_C(sKV);
     cute::axpby(1.0, tCrNewKV, 1.0, tCsKV);
+
+    __syncthreads();
 
     Tensor gKV = make_tensor(make_gmem_ptr<float>(kv_out + block_id * kHeadDim * kHeadDim),
                              make_shape(Int<kHeadDim>{}, Int<kHeadDim>{}), make_stride(Int<kHeadDim>{}, Int<1>{})); // d x d
@@ -352,6 +350,8 @@ __global__ void compute_kv_kernel(const half_t* k, const half_t* v, float* kv_ou
     // copy kv result to global
     cute::copy(tCsKV, tCgKV);
 
+
+    __syncthreads();
   }
 
 }
