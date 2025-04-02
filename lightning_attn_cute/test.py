@@ -149,6 +149,26 @@ def lightning_attn_no_decay(
     return output, kv_output, o_inter_output, o_intra_output
 
 
+def torch_compute_kv(k, v, BLOCK = 64):
+    B, H, N, d = q.shape
+    NUM_BLOCK = (N + BLOCK - 1) // BLOCK
+
+    kv = torch.zeros(d, d).to(torch.float32).to(q.device)
+    kv_output = torch.zeros(NUM_BLOCK, d, d).to(torch.float32).to(q.device)
+
+    for i in range(NUM_BLOCK):
+        si = i * BLOCK
+        ei = min(si + BLOCK, N)
+        ki = k[:, :, si:ei].contiguous().to(torch.float32)
+        vi = v[:, :, si:ei].contiguous().to(torch.float32)
+
+        new_kv = torch.matmul(ki.transpose(-1, -2), vi)
+        print(f"new_kv type: {new_kv.dtype}")
+        kv = kv + new_kv
+        kv_output[i] = kv.detach().clone()
+        print(f"data types.ki : {ki.dtype}, vi : {vi.dtype},  new_kv: {new_kv.dtype}, kv: {kv.dtype}")
+    return kv_output
+
 
 def set_seed(seed=42):
     # Python 随机模块
@@ -260,6 +280,29 @@ def test_forward_without_decay_precision(q, k, v):
     print("✅ Two implementations match")
 
 
+def test_kv_match(k, v):
+    torch_kv_output = torch_compute_kv(k, v)
+    cute_kv_output = myflash.cute_compute_kv(k, v)
+
+    BLOCK = 64
+    B, H, N, d = q.shape
+    num_block = (N + BLOCK - 1) // BLOCK
+
+    print(f"num_block : {num_block}")
+
+    for i in range(num_block):
+        print(f"torch_kv_output shape: {torch_kv_output[i].shape}")
+        print(f"cute_kv_output shape: {cute_kv_output[i].shape}")
+        torch.testing.assert_close(
+            torch_kv_output[i],
+            cute_kv_output[i],
+            rtol=1e-3,
+            atol=1e-5,
+            msg=f"block : {i}, KV results are different.torch_kv_output: {torch_kv_output[i]}. cute_kv_output: {cute_kv_output[i]}",
+        )
+    print("✅ kv results match")
+
+
 # index = block_off[:, None] - block_off[None, :]  # 相对位置 BLOCK x BLOCK
 # s_index = -slope * index  # BLOCK * BLOCK
 # s_index = tl.where(index >= 0, s_index, float("-inf"))
@@ -283,4 +326,5 @@ q1 = q.transpose(1, 2).contiguous()
 k1 = k.transpose(1, 2).contiguous()
 v1 = v.transpose(1, 2).contiguous()
 
-test_forward_without_decay_precision(q1, k1, v1)
+# test_forward_without_decay_precision(q1, k1, v1)
+test_kv_match(k1, v1)
