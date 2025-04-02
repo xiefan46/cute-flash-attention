@@ -305,6 +305,8 @@ def test_kv_match_f16(k, v, myflash):
     torch_kv_output = torch_compute_kv_f16(k, v)
     cute_kv_output = myflash.cute_compute_kv_all_f16(k, v)
 
+    print(f"torch_kv_output dtype: {torch_kv_output.dtype}, cute_kv_output dtype: {cute_kv_output.dtype}")
+
     BLOCK = 64
     B, H, N, d = k.shape
     num_block = (N + BLOCK - 1) // BLOCK
