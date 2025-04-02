@@ -302,7 +302,7 @@ def test_kv_match(k, v, myflash):
 
 
 def test_kv_match_f16(k, v, myflash):
-    torch_kv_output = torch_compute_kv_f16(k, v)
+    torch_kv_output = torch_compute_kv_f16(k, v).to(torch.float32)
     # cute_kv_output = myflash.cute_compute_kv_all_f16(k, v)
     cute_kv_output = myflash.cute_compute_kv(k, v)
 
