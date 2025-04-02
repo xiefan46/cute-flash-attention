@@ -118,7 +118,7 @@ __global__ void compute_kv_kernel_all_f16(const half_t* k, const half_t* v, half
 
     __syncthreads();
 
-    cute::half_t one = cute::half_t(1.0f);
+    half_t one = half_t(1.0f);
 
     cute::axpby(one, tCrNewKV, one, tCsKV);
 
