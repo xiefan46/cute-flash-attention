@@ -339,7 +339,7 @@ __global__ void compute_kv_kernel(const half_t* k, const half_t* v, float* kv_ou
     clear(tCrNewKV);
     cute::gemm(mma, tArKt, tBrVt, tCrNewKV);
 
-
+    __syncthreads();
 
     cute::axpby(1.0, tCrNewKV, 1.0, tCsKV);
 

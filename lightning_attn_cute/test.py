@@ -128,8 +128,8 @@ def torch_compute_kv(k, v, BLOCK = 64):
     for i in range(NUM_BLOCK):
         si = i * BLOCK
         ei = min(si + BLOCK, N)
-        ki = k[:, :, si:ei].contiguous().to(torch.float16)
-        vi = v[:, :, si:ei].contiguous().to(torch.float16)
+        ki = k[:, :, si:ei].contiguous().to(torch.float32)
+        vi = v[:, :, si:ei].contiguous().to(torch.float32)
 
         new_kv = torch.matmul(ki.transpose(-1, -2), vi).to(torch.float32)
         kv = kv + new_kv
