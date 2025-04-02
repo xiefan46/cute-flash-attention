@@ -96,7 +96,7 @@ def lightning_attn_no_decay(
 
         output[:, :, si:ei] = (qkv_none_diag + qkv_diag).to(torch.float16)
         # new_kv = torch.matmul(ki.transpose(-1, -2).to(vi.dtype), vi).to(torch.float32)
-        new_kv = torch.matmul(ki.transpose(-1, -2), vi).to(torch.float32)
+        new_kv = torch.matmul(ki.transpose(-1, -2), vi)
         kv = kv + new_kv
         kv_output[i] = kv.detach().clone()
 
