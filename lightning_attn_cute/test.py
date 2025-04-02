@@ -273,6 +273,8 @@ def test_kv_match(k, v, myflash):
             msg=f"block : {i}, KV results are different.torch_kv_output: {torch_kv_output[i]}. cute_kv_output: {cute_kv_output[i]}",
         )
 
+        print(f"✅ block : {i}, kv results match")
+
     print("✅ kv results match")
 
 
