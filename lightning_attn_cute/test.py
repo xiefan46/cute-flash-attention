@@ -374,7 +374,7 @@ def test_kv_match_amp(k, v, myflash):
     assert cute_kv_output_f32.dtype == torch.float32
 
     torch_kv_output = torch_kv_output_f32.to(torch.float16)
-    cute_kv_output = cute_kv_output_f32.to(torch.float16) 
+    cute_kv_output = cute_kv_output_f32.to(torch.float16)
 
     # cute_kv_output = myflash.cute_compute_kv(k, v).half()
 
@@ -399,6 +399,8 @@ def test_kv_match_amp(k, v, myflash):
         #     atol=1e-5,
         #     msg=f"block : {i}, KV results are different.torch_kv_output: {torch_kv_output[i]}. cute_kv_output: {cute_kv_output[i]}",
         # )
+
+        print(f"(24, 21): torch: {torch_kv_output[i, 24, 21]}, cute: {cute_kv_output[i, 24, 21]}")
 
         torch.testing.assert_close(
             torch_kv_output[i],
