@@ -140,6 +140,9 @@ def torch_compute_kv(k, v, BLOCK = 64):
 
 def torch_compute_amp(k, v, BLOCK = 64):
 
+    assert k.dtype == torch.float16
+    assert v.dtype == torch.float16
+
     B, H, N, d = k.shape
     NUM_BLOCK = (N + BLOCK - 1) // BLOCK
 
