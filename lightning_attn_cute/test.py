@@ -5,6 +5,7 @@ from torch.utils.cpp_extension import load
 from torch.nn import functional as F
 import random
 import numpy as np
+from torch.cuda.amp import autocast, GradScaler
 # from flashinfer import single_prefill_with_kv_cache
 # from flash_attn import flash_attn_func
 
@@ -132,6 +133,27 @@ def torch_compute_kv(k, v, BLOCK = 64):
         vi = v[:, :, si:ei].contiguous().to(torch.float32)
 
         new_kv = torch.matmul(ki.transpose(-1, -2), vi).to(torch.float32)
+        kv = kv + new_kv
+        kv_output[i] = kv.detach().clone()
+        print(f"data types.ki : {ki.dtype}, vi : {vi.dtype},  new_kv: {new_kv.dtype}, kv: {kv.dtype}")
+    return kv_output
+
+def torch_compute_amp(k, v, BLOCK = 64):
+
+    B, H, N, d = k.shape
+    NUM_BLOCK = (N + BLOCK - 1) // BLOCK
+
+    kv = torch.zeros(d, d).to(torch.float32).to(q.device)
+    kv_output = torch.zeros(NUM_BLOCK, d, d).to(torch.float32).to(q.device)
+
+    for i in range(NUM_BLOCK):
+        si = i * BLOCK
+        ei = min(si + BLOCK, N)
+        ki = k[:, :, si:ei].contiguous()
+        vi = v[:, :, si:ei].contiguous()
+        with autocast():
+            new_kv = torch.matmul(ki.transpose(-1, -2), vi)
+        new_kv = new_kv.to(torch.float32)
         kv = kv + new_kv
         kv_output[i] = kv.detach().clone()
         print(f"data types.ki : {ki.dtype}, vi : {vi.dtype},  new_kv: {new_kv.dtype}, kv: {kv.dtype}")
@@ -339,6 +361,48 @@ def test_kv_match_f16(k, v, myflash):
     print("✅ kv results match")
 
 
+def test_kv_match_amp(k, v, myflash):
+    # torch_kv_output = torch_compute_kv_f16(k, v)
+    torch_kv_output = torch_compute_amp(k, v)
+    cute_kv_output = myflash.cute_compute_kv(k, v)
+
+
+    assert torch_kv_output.dtype == torch.float32
+    assert cute_kv_output.dtype == torch.float32
+
+    # cute_kv_output = myflash.cute_compute_kv(k, v).half()
+
+    print(f"torch_kv_output dtype: {torch_kv_output.dtype}, cute_kv_output dtype: {cute_kv_output.dtype}")
+
+    BLOCK = 64
+    B, H, N, d = k.shape
+    num_block = (N + BLOCK - 1) // BLOCK
+
+    print(f"test_kv_match. num_block : {num_block}")
+
+    for i in range(num_block):
+        print(f"torch_kv_output shape: {torch_kv_output[i].shape}")
+        print(f"cute_kv_output shape: {cute_kv_output[i].shape}")
+
+        print(f"block: {i}, torch_kv_output: {torch_kv_output[i]}, cute_kv_output: {cute_kv_output[i]}")
+
+        # torch.testing.assert_close(
+        #     torch_kv_output[i],
+        #     cute_kv_output[i],
+        #     rtol=1e-3,
+        #     atol=1e-5,
+        #     msg=f"block : {i}, KV results are different.torch_kv_output: {torch_kv_output[i]}. cute_kv_output: {cute_kv_output[i]}",
+        # )
+
+        torch.testing.assert_close(
+            torch_kv_output[i],
+            cute_kv_output[i],
+        )
+
+        print(f"✅ block : {i}, kv results match")
+
+    print("✅ kv results match")
+
 # index = block_off[:, None] - block_off[None, :]  # 相对位置 BLOCK x BLOCK
 # s_index = -slope * index  # BLOCK * BLOCK
 # s_index = tl.where(index >= 0, s_index, float("-inf"))
@@ -402,4 +466,4 @@ if __name__ == "__main__":
 
     # test_forward_without_decay_precision(q1, k1, v1)
     # test_kv_match(k1, v1, myflash)
-    test_kv_match_f16(k1, v1, myflash)
+    test_kv_match_amp(k1, v1, myflash)
