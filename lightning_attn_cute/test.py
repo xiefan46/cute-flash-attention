@@ -9,38 +9,7 @@ import numpy as np
 # from flash_attn import flash_attn_func
 
 # Add a new environment variable  
-os.environ['TORCH_CUDA_ARCH_LIST'] = '8.0'
 
-REMOVE_NVCC_FLAGS = [
-    "-D__CUDA_NO_HALF_OPERATORS__",
-    "-D__CUDA_NO_HALF_CONVERSIONS__",
-    "-D__CUDA_NO_BFLOAT16_CONVERSIONS__",
-    "-D__CUDA_NO_HALF2_OPERATORS__",
-]
-for flag in REMOVE_NVCC_FLAGS:
-    try:
-        torch.utils.cpp_extension.COMMON_NVCC_FLAGS.remove(flag)
-    except ValueError:
-        pass
-
-
-torch.manual_seed(0)
-# Load the CUDA kernel as a python module
-myflash = load(name='myflash', 
-                    sources=[
-                        'main.cpp',
-                        'light_attn_without_decay.cu',
-                        'light_attn_without_decay_precision.cu',
-                    ], 
-                    extra_cuda_cflags=[
-                        '-O2', 
-                        '-lcublas', 
-                        '-lcublasLt', 
-                        '-std=c++17', 
-                        '-I/root/cutlass/include',
-                        '-I/root/cutlass/tools/util/include',
-                    ], 
-                )
 
 def compute_qk_manual(q, k):
     return q @ k.transpose(-2, -1)
@@ -150,7 +119,7 @@ def lightning_attn_no_decay(
 
 
 def torch_compute_kv(k, v, BLOCK = 64):
-    B, H, N, d = q.shape
+    B, H, N, d = k.shape
     NUM_BLOCK = (N + BLOCK - 1) // BLOCK
 
     kv = torch.zeros(d, d).to(torch.float32).to(q.device)
@@ -280,7 +249,7 @@ def test_forward_without_decay_precision(q, k, v):
     print("✅ Two implementations match")
 
 
-def test_kv_match(k, v):
+def test_kv_match(k, v, myflash):
     torch_kv_output = torch_compute_kv(k, v)
     cute_kv_output = myflash.cute_compute_kv(k, v)
 
@@ -311,20 +280,57 @@ def test_kv_match(k, v):
 def test_intra_block_compute(q, k, v):
     pass
 
-set_seed(10086)
-B = 1
-H = 1
-N = 256
-# NOTE: we only support d = 64!
-d = 64
+
+if __name__ == "__main__":
+
+    os.environ['TORCH_CUDA_ARCH_LIST'] = '8.0'
+
+    REMOVE_NVCC_FLAGS = [
+        "-D__CUDA_NO_HALF_OPERATORS__",
+        "-D__CUDA_NO_HALF_CONVERSIONS__",
+        "-D__CUDA_NO_BFLOAT16_CONVERSIONS__",
+        "-D__CUDA_NO_HALF2_OPERATORS__",
+    ]
+    for flag in REMOVE_NVCC_FLAGS:
+        try:
+            torch.utils.cpp_extension.COMMON_NVCC_FLAGS.remove(flag)
+        except ValueError:
+            pass
 
 
-q = torch.randn(B, N, H, d).cuda().half()
-k = torch.randn(B, N, H, d).cuda().half()
-v = torch.randn(B, N, H, d).cuda().half()
-q1 = q.transpose(1, 2).contiguous()
-k1 = k.transpose(1, 2).contiguous()
-v1 = v.transpose(1, 2).contiguous()
+    torch.manual_seed(0)
+    # Load the CUDA kernel as a python module
+    myflash = load(name='myflash',
+                   sources=[
+                       'main.cpp',
+                       'light_attn_without_decay.cu',
+                       'light_attn_without_decay_precision.cu',
+                   ],
+                   extra_cuda_cflags=[
+                       '-O2',
+                       '-lcublas',
+                       '-lcublasLt',
+                       '-std=c++17',
+                       '-I/root/cutlass/include',
+                       '-I/root/cutlass/tools/util/include',
+                   ],
+                   )
 
-# test_forward_without_decay_precision(q1, k1, v1)
-test_kv_match(k1, v1)
+
+    set_seed(10086)
+    B = 1
+    H = 1
+    N = 256
+    # NOTE: we only support d = 64!
+    d = 64
+
+
+    q = torch.randn(B, N, H, d).cuda().half()
+    k = torch.randn(B, N, H, d).cuda().half()
+    v = torch.randn(B, N, H, d).cuda().half()
+    q1 = q.transpose(1, 2).contiguous()
+    k1 = k.transpose(1, 2).contiguous()
+    v1 = v.transpose(1, 2).contiguous()
+
+    # test_forward_without_decay_precision(q1, k1, v1)
+    test_kv_match(k1, v1, myflash)
