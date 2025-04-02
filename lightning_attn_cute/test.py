@@ -265,12 +265,17 @@ def test_kv_match(k, v, myflash):
 
         print(f"block: {i}, torch_kv_output: {torch_kv_output[i]}, cute_kv_output: {cute_kv_output[i]}")
 
+        # torch.testing.assert_close(
+        #     torch_kv_output[i],
+        #     cute_kv_output[i],
+        #     rtol=1e-3,
+        #     atol=1e-5,
+        #     msg=f"block : {i}, KV results are different.torch_kv_output: {torch_kv_output[i]}. cute_kv_output: {cute_kv_output[i]}",
+        # )
+
         torch.testing.assert_close(
             torch_kv_output[i],
-            cute_kv_output[i],
-            rtol=1e-3,
-            atol=1e-5,
-            msg=f"block : {i}, KV results are different.torch_kv_output: {torch_kv_output[i]}. cute_kv_output: {cute_kv_output[i]}",
+            cute_kv_output[i]
         )
 
         print(f"✅ block : {i}, kv results match")
