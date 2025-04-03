@@ -131,7 +131,7 @@ def torch_lightning_attn(q, k, v, q_decay, k_decay, diag_decay, block_decay, BLO
     return output
 
 
-def test_forward_without_decay_precision(q, k, v, myflash):
+def test_forward_with_decay(q, k, v, myflash):
 
     B, H, N, d = q.shape
     BLOCK = 64
@@ -227,4 +227,4 @@ if __name__ == "__main__":
     v1 = v.transpose(1, 2).contiguous()
 
 
-    print_decay_tensors(q1)
+    test_forward_with_decay(q1, k1, v1, myflash)
