@@ -181,7 +181,7 @@ __global__ void flash_forward(const half_t* q, const half_t* k, const half_t* v,
     }
     assert(q_decay_r.layout() == tArQ.layout());
     auto multiply_op = [] (auto a, auto b) {
-      reuturn a * b;
+      return a * b;
     };
     cute::transform(q_decay_r, tArQ, tArQ, multiply_op);
 
