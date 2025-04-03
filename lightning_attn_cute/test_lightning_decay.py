@@ -472,6 +472,11 @@ def print_decay_tensors(q, BLOCK = 64):
 
     print(f"slope_rate: {slope_rate.shape}, q_decay: {q_decay.shape}, k_decay: {k_decay.shape}, diag_decay: {diag_decay.shape}, block_decay: {block_decay.shape}")
 
+    print(f"q_decay: {q_decay}")
+
+    print(f"k_decay: {k_decay}")
+
+
 if __name__ == "__main__":
 
     os.environ['TORCH_CUDA_ARCH_LIST'] = '8.0'
