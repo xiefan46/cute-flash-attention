@@ -478,6 +478,8 @@ def print_decay_tensors(q, BLOCK = 64):
 
     print(f"q_decay expend: {q_decay.expand(-1, -1, BLOCK)}")
 
+    print(f"q_decay expend: {q_decay.expand(-1, -1, BLOCK)}")
+
 
 if __name__ == "__main__":
 
@@ -517,8 +519,8 @@ if __name__ == "__main__":
 
 
     set_seed(10086)
-    B = 1
-    H = 1
+    B = 128
+    H = 64
     N = 512
     # NOTE: we only support d = 64!
     d = 64
