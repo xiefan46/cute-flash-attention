@@ -229,7 +229,9 @@ __global__ void flash_forward(const half_t* q, const half_t* k, const half_t* v,
 
 
 // q [B, H, N, d] k  [B, H, N, d] v [B, H, N, d]
-torch::Tensor forward_without_decay(torch::Tensor q, torch::Tensor k, torch::Tensor v) {
+// q_decay [H, BLOCK, BLOCK], k_decay
+// q_decay: torch.Size([64, 64, 1]), k_decay: torch.Size([64, 64, 1]), diag_decay: torch.Size([1, 64, 64, 64]), block_decay: torch.Size([64, 1, 1])
+torch::Tensor forward_wit_decay(torch::Tensor q, torch::Tensor k, torch::Tensor v) {
   int B = q.size(0);
   int H = q.size(1);
   int N = q.size(2);

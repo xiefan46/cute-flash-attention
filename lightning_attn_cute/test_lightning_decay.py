@@ -480,6 +480,10 @@ def print_decay_tensors(q, BLOCK = 64):
 
     print(f"q_decay expend: {q_decay.expand(-1, -1, BLOCK)}")
 
+    print(f"diag_decay squeeze: {diag_decay.squeeze(dim=0).shape}")
+
+    print(f"block_decay expend: {block_decay.expand(-1, BLOCK, BLOCK).shape}")
+
 
 if __name__ == "__main__":
 
