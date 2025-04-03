@@ -476,7 +476,7 @@ def print_decay_tensors(q, BLOCK = 64):
 
     print(f"k_decay: {k_decay}")
 
-    print(f"q_decay expend: {q_decay.expend(-1, -1, BLOCK)}")
+    print(f"q_decay expend: {q_decay.expand(-1, -1, BLOCK)}")
 
 
 if __name__ == "__main__":
