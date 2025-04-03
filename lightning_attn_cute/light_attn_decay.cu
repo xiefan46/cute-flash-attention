@@ -174,6 +174,21 @@ __global__ void flash_forward(const half_t* q, const half_t* k, const half_t* v,
     Tensor tBrK = thr_mma.partition_fragment_B(gK);
     cute::copy(tAgQ, tArQ);
     cute::copy(tBgK, tBrK);
+
+    // multiply q_decay
+    if (thread0()) {
+      PRINT_TENSOR("tArQ before", tArQ);
+    }
+    assert(q_decay_r.layout() == tArQ.layout());
+    auto multiply_op = [] (auto a, auto b) {
+      reuturn a * b;
+    }
+    cute::transform(q_decay_r, tArQ, tArQ, multiply_op);
+
+    if (thread0()) {
+      PRINT_TENSOR("tArQ after", tArQ);
+    }
+
     Tensor tCrS = partition_fragment_C(mma, make_shape(Int<BLOCK>{}, Int<BLOCK>{}));
     clear(tCrS);
 
