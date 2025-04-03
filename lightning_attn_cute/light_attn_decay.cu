@@ -58,23 +58,6 @@ struct FlashConfig {
 
 }  // namespace config
 
-
-
-//for i in range(NUM_BLOCK):
-//        q = tl.load(Q_start + q_off, mask=block_off[:, None] < n, other=0.0).to(tl.float32)
-//        k_t = tl.load(K_start + k_off, mask=block_off[None, :] < n, other=0.0).to(tl.float32)
-//        v = tl.load(V_start + vo_off, mask=block_off[:, None] < n, other=0.0).to(tl.float32)
-//        o_intra = tl.dot(tl.dot(q, k_t) * diag_decay, v)
-//
-//        o_inter = tl.dot(q, kv) * q_decay
-//        o = o_intra + o_inter
-//        tl.store(O_start + vo_off, o.to(O.dtype.element_ty), mask=block_off[:, None] < n)
-//        new_kv = tl.dot(k_t * k_decay, v)
-//        kv = kv * block_decay + new_kv
-//
-//        block_off += BLOCK
-
-
 template<typename Tensor>
 __forceinline__ __device__ auto fp32_to_fp16(Tensor& src_fp32) {
   using namespace cute;
@@ -89,7 +72,7 @@ __forceinline__ __device__ auto fp32_to_fp16(Tensor& src_fp32) {
 }
 
 template <typename Thr_MMA, typename config>
-__forceinline__ __device__ cute::Tensor load_decay_tensor_qk(const half_t* data_ptr, Thr_MMA thr_mma, const int head_id) {
+__forceinline__ __device__ auto load_decay_tensor_qk(const half_t* data_ptr, Thr_MMA thr_mma, const int head_id) {
     using namespace cute;
     constexpr int BLOCK = config::BLOCK;
     Tensor g_decay = make_tensor(make_gmem_ptr<half_t>(data_ptr + head_id * BLOCK * BLOCK), make_shape(Int<BLOCK>{}, Int<BLOCK>{}), make_stride(Int<BLOCK>{}, Int<1>{}));
@@ -100,7 +83,7 @@ __forceinline__ __device__ cute::Tensor load_decay_tensor_qk(const half_t* data_
 
 
 template <typename Thr_MMA, typename config>
-__forceinline__ __device__ cute::Tensor load_decay_tensor_diag_block(const half_t* data_ptr, Thr_MMA thr_mma, const int head_id) {
+__forceinline__ __device__ auto load_decay_tensor_diag_block(const half_t* data_ptr, Thr_MMA thr_mma, const int head_id) {
     using namespace cute;
     constexpr int BLOCK = config::BLOCK;
     Tensor g_decay = make_tensor(make_gmem_ptr<half_t>(data_ptr + head_id * BLOCK * BLOCK), make_shape(Int<BLOCK>{}, Int<BLOCK>{}), make_stride(Int<BLOCK>{}, Int<1>{}));
@@ -258,9 +241,6 @@ __global__ void flash_forward(const half_t* q, const half_t* k, const half_t* v,
     cute::gemm(mma, tArKt, tBrVt, tCrNewKV);
     cute::axpby(1.0, tCrNewKV, 1.0, tCsKV);
   }
-
-
-  // Tensor OKV = make_tensor(make_gmem_ptr<half_t>(o_kv + bs_head_offset), make_shape(Int<kHeadDim>{}, Int<kHeadDim>{}), make_stride(Int<kHeadDim>{}, Int<1>{})); // d x d
 
 }
 
