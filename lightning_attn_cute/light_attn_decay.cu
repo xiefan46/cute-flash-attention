@@ -88,13 +88,36 @@ __forceinline__ __device__ auto fp32_to_fp16(Tensor& src_fp32) {
   return dest_fp16;
 }
 
+template <typename Thr_MMA, typename config>
+__forceinline__ __device__ cute::Tensor load_decay_tensor_qk(const half_t* data_ptr, Thr_MMA thr_mma, const int head_id) {
+    using namespace cute;
+    constexpr int BLOCK = config::BLOCK;
+    Tensor g_decay = make_tensor(make_gmem_ptr<half_t>(data_ptr + head_id * BLOCK * BLOCK), make_shape(Int<BLOCK>{}, Int<BLOCK>{}), make_stride(Int<BLOCK>{}, Int<1>{}));
+    Tensor r_decay = thr_mma.partition_fragment_B(g_decay);
+    copy(g_decay, r_decay);
+    return r_decay;
+}
+
+
+template <typename Thr_MMA, typename config>
+__forceinline__ __device__ cute::Tensor load_decay_tensor_diag_block(const half_t* data_ptr, Thr_MMA thr_mma, const int head_id) {
+    using namespace cute;
+    constexpr int BLOCK = config::BLOCK;
+    Tensor g_decay = make_tensor(make_gmem_ptr<half_t>(data_ptr + head_id * BLOCK * BLOCK), make_shape(Int<BLOCK>{}, Int<BLOCK>{}), make_stride(Int<BLOCK>{}, Int<1>{}));
+    Tensor r_decay = thr_mma.partition_fragment_C(g_decay);
+    copy(g_decay, r_decay);
+    return r_decay;
+}
+
 // TODO:
 // 1. smem要怎么处理才能避免相互覆盖的问题
 // 2. smem如何处理多stage
 // 3. gmem到smem的copy似乎没有流水线
 // 4. 给smem增加static check. 参考 https://github.com/NVIDIA/cutlass/blob/main/media/docs/cute/0x_gemm_tutorial.md
 template <typename config>
-__global__ void flash_forward(const half_t* q, const half_t* k, const half_t* v, half_t* o, const int B, const int H, const int N) {
+__global__ void flash_forward(const half_t* q, const half_t* k, const half_t* v, half_t* o,
+                              const half_t* q_decay, const half_t* k_decay, const half_t* diag_decay, const half_t* block_decay,
+                              const int B, const int H, const int N) {
   using namespace cute;
   using TiledMMA = typename config::TiledMMA;
 
@@ -104,6 +127,7 @@ __global__ void flash_forward(const half_t* q, const half_t* k, const half_t* v,
 
 
   const int bx = blockIdx.x;
+  const int head_id = bx % H;
   const int tx = threadIdx.x;
   const int bs_head_offset = bx * N * kHeadDim;
   const int num_block = (N + BLOCK - 1) / BLOCK;
@@ -134,6 +158,21 @@ __global__ void flash_forward(const half_t* q, const half_t* k, const half_t* v,
     PRINT("mma size", size(mma));
     PRINT("num_block", num_block);
   }
+
+
+  // load decay tensors
+  Tensor q_decay_r = load_decay_tensor_qk<decltype(thr_mma), config>(q_decay, thr_mma, head_id);
+  Tensor k_decay_r = load_decay_tensor_qk<decltype(thr_mma), config>(k_decay, thr_mma, head_id);
+  Tensor diag_decay_r = load_decay_tensor_diag_block<decltype(thr_mma), config>(diag_decay, thr_mma, head_id);
+  Tensor block_decay_r = load_decay_tensor_diag_block<decltype(thr_mma), config>(block_decay, thr_mma, head_id);
+
+  if (thread0()) {
+    PRINT("q_decay_r", q_decay_r);
+    PRINT("k_decay_r", k_decay_r);
+    PRINT("diag_decay_r", diag_decay_r);
+    PRINT("block_decay_r", block_decay_r);
+  }
+
 
   for (int block_id = 0; block_id < num_block; block_id++) {
     Tensor gQ = local_tile(Q, make_tile(Int<BLOCK>{}, Int<kHeadDim>{}), make_coord(block_id, 0)); //BLOCK x d
@@ -229,9 +268,11 @@ __global__ void flash_forward(const half_t* q, const half_t* k, const half_t* v,
 
 
 // q [B, H, N, d] k  [B, H, N, d] v [B, H, N, d]
-// q_decay [H, BLOCK, BLOCK], k_decay
-// q_decay: torch.Size([64, 64, 1]), k_decay: torch.Size([64, 64, 1]), diag_decay: torch.Size([1, 64, 64, 64]), block_decay: torch.Size([64, 1, 1])
-torch::Tensor forward_wit_decay(torch::Tensor q, torch::Tensor k, torch::Tensor v) {
+// q_decay,k_decay,diag_decay, block_decay [H, BLOCK, BLOCK]
+
+
+torch::Tensor forward_wit_decay(torch::Tensor q, torch::Tensor k, torch::Tensor v,
+                                torch::Tensor q_decay, torch::Tensor k_decay, torch::Tensor diag_decay, torch::Tensor block_decay) {
   int B = q.size(0);
   int H = q.size(1);
   int N = q.size(2);
@@ -252,7 +293,12 @@ torch::Tensor forward_wit_decay(torch::Tensor q, torch::Tensor k, torch::Tensor 
   PRINT("grid", grid);
   PRINT("block", block);
 
-  partition_kernel<<<grid, block>>>((cute::half_t*)q.data_ptr(), (cute::half_t*)k.data_ptr(),
-                                              (cute::half_t*)v.data_ptr(), (cute::half_t*)out.data_ptr(), B, H, N);
+  partition_kernel<<<grid, block>>>((cute::half_t*) q.data_ptr(), (cute::half_t*) k.data_ptr(),
+                                              (cute::half_t*) v.data_ptr(), (cute::half_t*) out.data_ptr(),
+                                            (cute::half_t*)q_decay.data_ptr(),
+                                            (cute::half_t*)k_decay.data_ptr(),
+                                            (cute::half_t*)diag_decay.data_ptr(),
+                                            (cute::half_t*)block_decay.data_ptr(),
+                                            B, H, N);
   return out;
 }

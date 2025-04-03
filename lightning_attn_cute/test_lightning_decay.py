@@ -98,6 +98,84 @@ def print_decay_tensors(q, BLOCK = 64):
     print(f"block_decay expend: {block_decay.expand(-1, BLOCK, BLOCK).shape}")
 
 
+
+def torch_lightning_attn(q, k, v, q_decay, k_decay, diag_decay, block_decay, BLOCK):
+
+    B, H, N, d = q.shape
+
+    assert N % BLOCK == 0
+    NUM_BLOCK = (N + BLOCK - 1) // BLOCK
+
+
+    kv = torch.zeros(B, H, d, d).to(torch.float32).to(q.device)
+    output = torch.empty((B, H, N, d), dtype=q.dtype, device=q.device)
+    for i in range(NUM_BLOCK):
+        si = i * BLOCK
+        ei = si + BLOCK
+        m = ei - si
+        assert m == BLOCK
+        qi = q[:, :, si:ei].contiguous()
+        ki = k[:, :, si:ei].contiguous()
+        vi = v[:, :, si:ei].contiguous()
+        qkv_none_diag = torch.matmul(qi * q_decay[:, :m], kv).to(torch.float32)
+        # diag
+        qk = (
+                torch.matmul(qi, ki.transpose(-1, -2)).to(torch.float32)
+                * diag_decay[:, :, :m, :m]
+        )
+        qkv_diag = torch.matmul(qk, vi.to(torch.float32))
+
+        output[:, :, si:ei] = qkv_none_diag + qkv_diag
+        kv = block_decay * kv + torch.matmul(
+            (ki * k_decay[:, -m:]).transpose(-1, -2).to(vi.dtype), vi)
+    return output
+
+
+def test_forward_without_decay_precision(q, k, v, myflash):
+
+    B, H, N, d = q.shape
+    BLOCK = 64
+    array = torch.arange(BLOCK).to(q) + 1
+    slope_rate = _build_slope_tensor(H).to(q.device)
+    q_decay = torch.exp(-slope_rate * array.reshape(-1, 1))
+    k_decay = torch.exp(-slope_rate * (BLOCK - array.reshape(-1, 1)))
+    index = array[:, None] - array[None, :]
+    s_index = (
+            slope_rate
+            * index[
+                None,
+                None,
+            ]
+    )
+    s_index = torch.where(index >= 0, -s_index, float("-inf"))
+    diag_decay = torch.exp(s_index)
+    block_decay = torch.exp(-slope_rate * BLOCK)
+
+    torch_output = torch_lightning_attn(q, k, v, q_decay, k_decay, diag_decay, block_decay, BLOCK)
+
+    q_decay_cute = q_decay.expand(-1, -1, BLOCK)
+    k_decay_cute = k_decay.expand(-1, -1, BLOCK)
+    diag_decay_cute = diag_decay.squeeze(dim=0)
+    block_decay_cute = block_decay.expand(-1, BLOCK, BLOCK)
+
+    assert q_decay_cute.shape == (H, BLOCK, BLOCK)
+    assert k_decay_cute.shape == (H, BLOCK, BLOCK)
+    assert diag_decay_cute.shape == (H, BLOCK, BLOCK)
+    assert block_decay_cute.shape == (H, BLOCK, BLOCK)
+
+    cute_output = myflash.forward_wit_decay(q, k, v, q_decay_cute, k_decay_cute, diag_decay_cute, block_decay_cute)
+
+    torch.testing.assert_close(
+        torch_output,
+        cute_output,
+        rtol=1e-3,
+        atol=1e-2,
+        msg="Lightning attention implementations produce different results",
+    )
+
+    print("✅ Two implementations match")
+
+
 if __name__ == "__main__":
 
     os.environ['TORCH_CUDA_ARCH_LIST'] = '8.0'
@@ -117,20 +195,20 @@ if __name__ == "__main__":
 
     torch.manual_seed(0)
     # Load the CUDA kernel as a python module
-    # myflash = load(name='myflash',
-    #                sources=[
-    #                    'main.cpp',
-    #                    'light_attn_decay.cu',
-    #                ],
-    #                extra_cuda_cflags=[
-    #                    '-O2',
-    #                    '-lcublas',
-    #                    '-lcublasLt',
-    #                    '-std=c++17',
-    #                    '-I/root/cutlass/include',
-    #                    '-I/root/cutlass/tools/util/include',
-    #                ],
-    #                )
+    myflash = load(name='myflash',
+                   sources=[
+                       'main.cpp',
+                       'light_attn_decay.cu',
+                   ],
+                   extra_cuda_cflags=[
+                       '-O2',
+                       '-lcublas',
+                       '-lcublasLt',
+                       '-std=c++17',
+                       '-I/root/cutlass/include',
+                       '-I/root/cutlass/tools/util/include',
+                   ],
+                   )
 
 
     set_seed(10086)
