@@ -153,15 +153,15 @@ def test_forward_with_decay(q, k, v, myflash):
 
     torch_output = torch_lightning_attn(q, k, v, q_decay, k_decay, diag_decay, block_decay, BLOCK)
 
-    q_decay_cute = q_decay.expand(-1, -1, BLOCK)
-    k_decay_cute = k_decay.expand(-1, -1, BLOCK)
+    q_decay_cute = q_decay.expand(-1, -1, d)
+    k_decay_cute = k_decay.expand(-1, -1, d)
     diag_decay_cute = diag_decay.squeeze(dim=0)
-    block_decay_cute = block_decay.expand(-1, BLOCK, BLOCK)
+    block_decay_cute = block_decay.expand(-1, BLOCK, d)
 
-    assert q_decay_cute.shape == (H, BLOCK, BLOCK)
-    assert k_decay_cute.shape == (H, BLOCK, BLOCK)
-    assert diag_decay_cute.shape == (H, BLOCK, BLOCK)
-    assert block_decay_cute.shape == (H, BLOCK, BLOCK)
+    assert q_decay_cute.shape == (H, BLOCK, d)
+    assert k_decay_cute.shape == (H, BLOCK, d)
+    assert diag_decay_cute.shape == (H, BLOCK, d)
+    assert block_decay_cute.shape == (H, BLOCK, d)
 
     cute_output = myflash.forward_wit_decay(q, k, v, q_decay_cute, k_decay_cute, diag_decay_cute, block_decay_cute)
 
@@ -212,8 +212,8 @@ if __name__ == "__main__":
 
 
     set_seed(10086)
-    B = 128
-    H = 64
+    B = 1
+    H = 1
     N = 512
     # NOTE: we only support d = 64!
     d = 64

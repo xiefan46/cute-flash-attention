@@ -75,7 +75,8 @@ template <typename Thr_MMA, typename config>
 __forceinline__ __device__ auto load_decay_tensor_qk(const half_t* data_ptr, Thr_MMA thr_mma, const int head_id) {
     using namespace cute;
     constexpr int BLOCK = config::BLOCK;
-    Tensor g_decay = make_tensor(make_gmem_ptr<half_t>(data_ptr + head_id * BLOCK * BLOCK), make_shape(Int<BLOCK>{}, Int<BLOCK>{}), make_stride(Int<BLOCK>{}, Int<1>{}));
+    constexpr int kHeadDim = config::kHeadDim;
+    Tensor g_decay = make_tensor(make_gmem_ptr<half_t>(data_ptr + head_id * BLOCK * kHeadDim), make_shape(Int<BLOCK>{}, Int<kHeadDim>{}), make_stride(Int<kHeadDim>{}, Int<1>{}));
     Tensor r_decay = thr_mma.partition_fragment_B(g_decay);
     copy(g_decay, r_decay);
     return r_decay;
@@ -86,7 +87,8 @@ template <typename Thr_MMA, typename config>
 __forceinline__ __device__ auto load_decay_tensor_diag_block(const half_t* data_ptr, Thr_MMA thr_mma, const int head_id) {
     using namespace cute;
     constexpr int BLOCK = config::BLOCK;
-    Tensor g_decay = make_tensor(make_gmem_ptr<half_t>(data_ptr + head_id * BLOCK * BLOCK), make_shape(Int<BLOCK>{}, Int<BLOCK>{}), make_stride(Int<BLOCK>{}, Int<1>{}));
+    constexpr int kHeadDim = config::kHeadDim;
+    Tensor g_decay = make_tensor(make_gmem_ptr<half_t>(data_ptr + head_id * BLOCK * kHeadDim), make_shape(Int<BLOCK>{}, Int<kHeadDim>{}), make_stride(Int<kHeadDim>{}, Int<1>{}));
     Tensor r_decay = thr_mma.partition_fragment_C(g_decay);
     copy(g_decay, r_decay);
     return r_decay;
@@ -248,7 +250,7 @@ __global__ void flash_forward(const half_t* q, const half_t* k, const half_t* v,
 
 
 // q [B, H, N, d] k  [B, H, N, d] v [B, H, N, d]
-// q_decay,k_decay,diag_decay, block_decay [H, BLOCK, BLOCK]
+// q_decay,k_decay,diag_decay, block_decay [H, BLOCK, d]
 
 
 torch::Tensor forward_wit_decay(torch::Tensor q, torch::Tensor k, torch::Tensor v,
