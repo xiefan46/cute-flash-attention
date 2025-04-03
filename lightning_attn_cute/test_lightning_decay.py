@@ -6,8 +6,7 @@ from torch.nn import functional as F
 import random
 import numpy as np
 from torch.cuda.amp import autocast, GradScaler
-
-from benchmark_triton_impl.util import _build_slope_tensor
+import math
 
 
 # from flashinfer import single_prefill_with_kv_cache
@@ -15,6 +14,33 @@ from benchmark_triton_impl.util import _build_slope_tensor
 
 # Add a new environment variable  
 
+
+def _build_slope_tensor(n_attention_heads: int):
+    def get_slopes(n):
+        def get_slopes_power_of_2(n):  # output 2^(- 8h / H) for h in 1, 2, ... H
+            start = 2 ** (-(2 ** -(math.log2(n) - 3)))
+            ratio = start
+            return [start * ratio ** i for i in range(n)]
+
+        if math.log2(n).is_integer():
+            return get_slopes_power_of_2(
+                n
+            )  # In the paper, we only train models that have 2^a heads for some a. This function has
+        else:  # some good properties that only occur when the input is a power of 2. To maintain that even
+            closest_power_of_2 = 2 ** math.floor(
+                math.log2(n)
+            )  # when the number of heads is not a power of 2, we use this workaround.
+            return (
+                    get_slopes_power_of_2(closest_power_of_2)
+                    + get_slopes(2 * closest_power_of_2)[0::2][: n - closest_power_of_2]
+            )
+
+    # h, 1, 1
+    slopes = torch.tensor(get_slopes(n_attention_heads)).reshape(
+        n_attention_heads, 1, 1
+    )
+
+    return slopes
 
 def compute_qk_manual(q, k):
     return q @ k.transpose(-2, -1)
@@ -468,7 +494,7 @@ if __name__ == "__main__":
     myflash = load(name='myflash',
                    sources=[
                        'main.cpp',
-                       'light_attn_without_decay.cu',
+                       'light_attn_decay.cu',
                        'light_attn_without_decay_precision.cu',
                        'light_attn_without_decay_precision_all_f16.cu',
                    ],
