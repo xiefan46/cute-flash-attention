@@ -159,6 +159,10 @@ __global__ void flash_forward(const half_t* q, const half_t* k, const half_t* v,
   }
 
 
+  auto multiply_op = [] (auto a, auto b) {
+      return a * b;
+  };
+
   for (int block_id = 0; block_id < num_block; block_id++) {
     Tensor gQ = local_tile(Q, make_tile(Int<BLOCK>{}, Int<kHeadDim>{}), make_coord(block_id, 0)); //BLOCK x d
     Tensor gK = local_tile(K, make_tile(Int<BLOCK>{}, Int<kHeadDim>{}), make_coord(block_id, 0)); //BLOCK x d
@@ -176,18 +180,15 @@ __global__ void flash_forward(const half_t* q, const half_t* k, const half_t* v,
     cute::copy(tBgK, tBrK);
 
     // multiply q_decay
-    if (thread0()) {
-      PRINT_TENSOR("tArQ before", tArQ);
-    }
+//    if (thread0()) {
+//      PRINT_TENSOR("tArQ before", tArQ);
+//    }
     assert(q_decay_r.layout() == tArQ.layout());
-    auto multiply_op = [] (auto a, auto b) {
-      return a * b;
-    };
     cute::transform(q_decay_r, tArQ, tArQ, multiply_op);
 
-    if (thread0()) {
-      PRINT_TENSOR("tArQ after", tArQ);
-    }
+//    if (thread0()) {
+//      PRINT_TENSOR("tArQ after", tArQ);
+//    }
 
     Tensor tCrS = partition_fragment_C(mma, make_shape(Int<BLOCK>{}, Int<BLOCK>{}));
     clear(tCrS);
