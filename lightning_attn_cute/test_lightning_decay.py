@@ -163,7 +163,7 @@ def test_forward_with_decay(q, k, v, myflash):
     assert diag_decay_cute.shape == (H, BLOCK, d)
     assert block_decay_cute.shape == (H, BLOCK, d)
 
-    cute_output = myflash.forward_wit_decay(q, k, v, q_decay_cute, k_decay_cute, diag_decay_cute, block_decay_cute)
+    cute_output = myflash.forward_with_decay(q, k, v, q_decay_cute, k_decay_cute, diag_decay_cute, block_decay_cute)
 
     torch.testing.assert_close(
         torch_output,
