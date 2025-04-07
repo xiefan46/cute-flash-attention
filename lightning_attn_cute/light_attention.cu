@@ -305,10 +305,12 @@ __global__ void flash_forward(const half_t* q, const half_t* k, const half_t* v,
         cute::copy(tAgKt, tArKt);
         cute::copy(tBgVt, tBrVt);
 
-        Tensor tArKt_decay = make_tensor_like(tArKt);
         if (thread0()) {
-          PRINT_TENSOR("tArKt_decay tensor before", tArKt_decay);
+            PRINT_TENSOR("tArKt tensor", tArKt);
         }
+
+        Tensor tArKt_decay = make_tensor_like(tArKt);
+
         clear(tArKt_decay);
 //        if (thread0()) {
 //            PRINT_TENSOR("tArKt_decay tensor before", tArKt_decay);
