@@ -81,7 +81,7 @@ def print_decay_tensors(q, BLOCK = 64):
     )
     s_index = torch.where(index >= 0, -s_index, float("-inf"))
     diag_decay = torch.exp(s_index)
-    block_decay = torch.exp(-slope_rate * BLOCK)
+    block_decay = torch.exp(-slope_rate * BLOCK).squeeze()
 
     print(f"slope_rate: {slope_rate.shape}, q_decay: {q_decay.shape}, k_decay: {k_decay.shape}, diag_decay: {diag_decay.shape}, block_decay: {block_decay.shape}")
 
@@ -95,7 +95,7 @@ def print_decay_tensors(q, BLOCK = 64):
 
     print(f"diag_decay squeeze: {diag_decay.squeeze(dim=0).shape}")
 
-    print(f"block_decay expend: {block_decay.expand(-1, BLOCK, BLOCK).shape}")
+    print(f"block_decay expend: {block_decay.shape}")
 
 
 
