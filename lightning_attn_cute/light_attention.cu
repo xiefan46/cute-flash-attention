@@ -89,7 +89,7 @@ __forceinline__ __device__ auto fp32_to_fp16(Tensor& src_fp32) {
   return dest_fp16;
 }
 
-
+// [H, BLOCK, d]
 template <typename Thr_MMA, typename config>
 __forceinline__ __device__ auto load_decay_tensor_q(const half_t* data_ptr, Thr_MMA thr_mma, const int head_id) {
     using namespace cute;
@@ -124,12 +124,12 @@ __forceinline__ __device__ auto load_decay_tensor_kt(const half_t* data_ptr, Thr
 }
 
 
+// [H, BLOCK, BLOCK]
 template <typename Thr_MMA, typename config>
 __forceinline__ __device__ auto load_decay_tensor_diag_block(const half_t* data_ptr, Thr_MMA thr_mma, const int head_id) {
     using namespace cute;
     constexpr int BLOCK = config::BLOCK;
-    constexpr int kHeadDim = config::kHeadDim;
-    Tensor g_decay = make_tensor(make_gmem_ptr<half_t>(data_ptr + head_id * BLOCK * kHeadDim), make_shape(Int<BLOCK>{}, Int<kHeadDim>{}), make_stride(Int<kHeadDim>{}, Int<1>{}));
+    Tensor g_decay = make_tensor(make_gmem_ptr<half_t>(data_ptr + head_id * BLOCK * BLOCK), make_shape(Int<BLOCK>{}, Int<BLOCK>{}), make_stride(Int<BLOCK>{}, Int<1>{}));
     Tensor r_decay = thr_mma.partition_fragment_C(g_decay);
     copy(g_decay, r_decay);
     return r_decay;
@@ -142,11 +142,12 @@ __forceinline__ __device__ auto load_decay_tensor_diag_block(const half_t* data_
 // 4. 给smem增加static check. 参考 https://github.com/NVIDIA/cutlass/blob/main/media/docs/cute/0x_gemm_tutorial.md
 
 // q [B, H, N, d] k  [B, H, N, d] v [B, H, N, d]
-// q_decay,k_decay, [H, BLOCK, d]
-// block_decay [H]
+// q_decay,k_decay, half [H, BLOCK, d]
+// diag_decay half [H, BLOCK, BLOCK]
+// block_decay float [H]
 template <typename config>
 __global__ void flash_forward(const half_t* q, const half_t* k, const half_t* v, half_t* o, const int B, const int H, const int N, float* kv_out,
-                              half_t* o_inter_out, half_t* o_intra_out, half_t* q_decay, half_t* k_decay, half_t* diag_decay, half_t* block_decay) {
+                              half_t* o_inter_out, half_t* o_intra_out, half_t* q_decay, half_t* k_decay, half_t* diag_decay, float* block_decay) {
     using namespace cute;
     using TiledMMA = typename config::TiledMMA;
 
@@ -192,7 +193,7 @@ __global__ void flash_forward(const half_t* q, const half_t* k, const half_t* v,
     Tensor q_decay_r = load_decay_tensor_q<decltype(thr_mma), config>(q_decay, thr_mma, head_id);
     Tensor k_decay_r = load_decay_tensor_k<decltype(thr_mma), config>(k_decay, thr_mma, head_id);
     Tensor diag_decay_r = load_decay_tensor_diag_block<decltype(thr_mma), config>(diag_decay, thr_mma, head_id);
-    Tensor block_decay_r = load_decay_tensor_diag_block<decltype(thr_mma), config>(block_decay, thr_mma, head_id);
+    float block_decay_r = block_decay[head_id];
 
     if (thread0()) {
         PRINT("q_decay_r", q_decay_r);
@@ -319,7 +320,7 @@ __global__ void flash_forward(const half_t* q, const half_t* k, const half_t* v,
 
 
 // q [B, H, N, d] k  [B, H, N, d] v [B, H, N, d]
-std::tuple<torch::Tensor, torch::Tensor, torch::Tensor, torch::Tensor> forward_without_decay_precision(torch::Tensor q, torch::Tensor k, torch::Tensor v,
+std::tuple<torch::Tensor, torch::Tensor, torch::Tensor, torch::Tensor> forward_with_decay(torch::Tensor q, torch::Tensor k, torch::Tensor v,
                                                                             torch::Tensor q_decay, torch::Tensor k_decay, torch::Tensor diag_decay, torch::Tensor block_decay) {
   int B = q.size(0);
   int H = q.size(1);
@@ -342,14 +343,14 @@ std::tuple<torch::Tensor, torch::Tensor, torch::Tensor, torch::Tensor> forward_w
   config::FlashConfig<cute::half_t> config;
   dim3 block = config.kThreadNum;
   dim3 grid(B * H);
-  auto partition_kernel = flash_forward<decltype(config)>;
+  auto kernel = flash_forward<decltype(config)>;
   PRINT("grid", grid);
   PRINT("block", block);
 
-  partition_kernel<<<grid, block>>>((cute::half_t*)q.data_ptr(), (cute::half_t*)k.data_ptr(),
+  kernel<<<grid, block>>>((cute::half_t*)q.data_ptr(), (cute::half_t*)k.data_ptr(),
                                               (cute::half_t*)v.data_ptr(), (cute::half_t*)out.data_ptr(), B, H, N, (float*)kv_out.data_ptr(),
                                     (cute::half_t*)o_inter_out.data_ptr(), (cute::half_t*)o_intra_out.data_ptr(),
-                                    (cute::half_t*) q_decay.data_ptr(),  (cute::half_t*) k_decay.data_ptr(),  (cute::half_t*) diag_decay.data_ptr(), (cute::half_t*) block_decay.data_ptr());
+                                    (cute::half_t*) q_decay.data_ptr(),  (cute::half_t*) k_decay.data_ptr(),  (cute::half_t*) diag_decay.data_ptr(), (float*) block_decay.data_ptr());
 
   cudaDeviceSynchronize();
   return std::make_tuple(out, kv_out, o_inter_out, o_intra_out);
