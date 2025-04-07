@@ -198,7 +198,7 @@ __global__ void flash_forward(const half_t* q, const half_t* k, const half_t* v,
 
     if (thread0()) {
         PRINT("q_decay_r", q_decay_r);
-        PRINT("k_decay_r", k_decay_r);
+        PRINT("kt_decay_r", kt_decay_r);
         PRINT("diag_decay_r", diag_decay_r);
         PRINT("block_decay_r", block_decay_r);
         PRINT("block_decay 1", block_decay[1]);
