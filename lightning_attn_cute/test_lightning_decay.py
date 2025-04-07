@@ -101,6 +101,14 @@ def print_decay_tensors(q, BLOCK = 64):
 
 def torch_lightning_attn(q, k, v, q_decay, k_decay, diag_decay, block_decay, BLOCK):
 
+    assert q.dtype == torch.float16
+    assert k.dtype == torch.float16
+    assert v.dtype == torch.float16
+    assert q_decay.dtype == torch.float16
+    assert k_decay.dtype == torch.float16
+    assert diag_decay.dtype == torch.float16
+    assert block_decay.dtype == torch.float32
+
     B, H, N, d = q.shape
 
     assert N % BLOCK == 0
@@ -117,17 +125,17 @@ def torch_lightning_attn(q, k, v, q_decay, k_decay, diag_decay, block_decay, BLO
         qi = q[:, :, si:ei].contiguous()
         ki = k[:, :, si:ei].contiguous()
         vi = v[:, :, si:ei].contiguous()
-        qkv_none_diag = torch.matmul(qi * q_decay[:, :m], kv).to(torch.float32)
+        qkv_none_diag = torch.matmul(qi * q_decay[:, :m], kv.to(torch.float16))
         # diag
         qk = (
-                torch.matmul(qi, ki.transpose(-1, -2)).to(torch.float32)
+                torch.matmul(qi, ki.transpose(-1, -2))
                 * diag_decay[:, :, :m, :m]
         )
-        qkv_diag = torch.matmul(qk, vi.to(torch.float32))
+        qkv_diag = torch.matmul(qk, vi)
 
         output[:, :, si:ei] = qkv_none_diag + qkv_diag
         kv = block_decay * kv + torch.matmul(
-            (ki * k_decay[:, -m:]).transpose(-1, -2).to(vi.dtype), vi)
+            (ki * k_decay[:, -m:]).transpose(-1, -2), vi)
     return output
 
 
