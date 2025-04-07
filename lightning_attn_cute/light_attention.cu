@@ -294,7 +294,8 @@ __global__ void flash_forward(const half_t* q, const half_t* k, const half_t* v,
         Tensor tCgO = thr_mma.partition_C(gO);
         cute::copy(tCrO_inter_f16, tCgO);
 
-
+        // TODO: figure out __syncthreads()放在什么地方合适，特别注意那种需要多个view进行计算的，比如smem_kv
+        __syncthreads();
         // Step5: Update KV
         // new_kv = tl.dot(k_t, v) d x BLOCK @ d x BLOCK = d x  d
         // kv = kv * block_decay + new_kv, block_decay = 1.0
@@ -307,6 +308,7 @@ __global__ void flash_forward(const half_t* q, const half_t* k, const half_t* v,
         cute::copy(tBgVt, tBrVt);
 
         Tensor tArKt_decay = make_tensor_like(tArKt);
+        clear(tArKt_decay);
         cute::transform(kt_decay_r, tArKt, tArKt_decay, multiply_op);
 
         Tensor tCrNewKV = thr_mma.partition_fragment_C(sKV);
@@ -325,7 +327,7 @@ __global__ void flash_forward(const half_t* q, const half_t* k, const half_t* v,
         Tensor tCgKV = thr_mma.partition_C(gKV);
         // copy kv result to global
         cute::copy(tCsKV, tCgKV);
-
+        __syncthreads();
     }
 
 }
