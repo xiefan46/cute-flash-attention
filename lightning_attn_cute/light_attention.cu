@@ -201,9 +201,7 @@ __global__ void flash_forward(const half_t* q, const half_t* k, const half_t* v,
         PRINT("kt_decay_r", kt_decay_r);
         PRINT("diag_decay_r", diag_decay_r);
         PRINT("block_decay_r", block_decay_r);
-        PRINT("block_decay 1", block_decay[1]);
-        PRINT("block_decay 15", block_decay[15]);
-        printf("block decay 0 printf = %f\n", block_decay_r);
+        PRINT("head id", head_id);
     }
 
     auto multiply_op = [] (auto a, auto b) {
@@ -314,6 +312,11 @@ __global__ void flash_forward(const half_t* q, const half_t* k, const half_t* v,
         Tensor tCrNewKV = thr_mma.partition_fragment_C(sKV);
         Tensor tCsKV = thr_mma.partition_C(sKV);
         clear(tCrNewKV);
+
+        if (thread0()) {
+          PRINT_TENSOR("tArKt_decay tensor", tArKt_decay);
+        }
+
         cute::gemm(mma, tArKt_decay, tBrVt, tCrNewKV);
 
         Tensor tCrNewKV_f16 =  fp32_to_fp16(tCrNewKV);
