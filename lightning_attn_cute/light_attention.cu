@@ -274,7 +274,7 @@ __global__ void flash_forward(const half_t* q, const half_t* k, const half_t* v,
 
         Tensor tArQ_decay = make_tensor_like(tArQ);
         clear(tArQ_decay);
-        cute::transform(q_decay_r, tArQ, tArQ_decay, multiply_op)
+        cute::transform(q_decay_r, tArQ, tArQ_decay, multiply_op);
 
         cute::gemm(mma, tArQ_decay, tBrKVt, tCrO_inter);
 
