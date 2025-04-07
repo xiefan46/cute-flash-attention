@@ -313,9 +313,9 @@ __global__ void flash_forward(const half_t* q, const half_t* k, const half_t* v,
         Tensor tCsKV = thr_mma.partition_C(sKV);
         clear(tCrNewKV);
 
-        if (thread0()) {
-          PRINT_TENSOR("tArKt_decay tensor", tArKt_decay);
-        }
+//        if (thread0()) {
+//          PRINT_TENSOR("tArKt_decay tensor", tArKt_decay);
+//        }
 
         cute::gemm(mma, tArKt_decay, tBrVt, tCrNewKV);
 
