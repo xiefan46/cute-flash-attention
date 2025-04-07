@@ -233,6 +233,11 @@ __global__ void flash_forward(const half_t* q, const half_t* k, const half_t* v,
         cute::gemm(mma, tArQ, tBrK, tCrS);
 
         Tensor tCrS_fp16 = fp32_to_fp16(tCrS);
+
+        if (thread0()) {
+          PRINT_TENSOR("tCrS_fp16", tCrS_fp16);
+        }
+
         Tensor tCrS_fp16_decay = make_tensor_like(tCrS_fp16);
         clear(tCrS_fp16_decay);
         cute::transform(diag_decay_r, tCrS_fp16, tCrS_fp16_decay, multiply_op);
@@ -240,107 +245,107 @@ __global__ void flash_forward(const half_t* q, const half_t* k, const half_t* v,
         // Step 2: compute O_intra
         // 将tCrS_f16转换为A layout，并且进行第二个gemm的计算
         // ((_2,_2),_4,_8) -> ((_2,_2),_4, (2, 4)) ->  -> ((2, 2, 2), 4, 4)
-        auto l = logical_divide(tCrS_fp16_decay.layout(), Shape<X, X, Int<2>>{});
-        auto tOrS_laytout = make_layout(make_layout(get<0, 0>(l), get<0, 1>(l), get<2, 0>(l)), get<1>(l), get<2, 1>(l));
-        Tensor tOrS = make_tensor(tCrS_fp16_decay.data(), tOrS_laytout);
-
-        Tensor tOgVt = thr_mma.partition_B(gVt);
-        Tensor tOrVt = thr_mma.partition_fragment_B(gVt);
-        cute::copy(tOgVt, tOrVt);
-
-        Tensor tOrO_intra = partition_fragment_C(mma, make_shape(Int<BLOCK>{}, Int<kHeadDim>{})); //BLOCK x d
-        cute::clear(tOrO_intra);
-
-        cute::gemm(mma, tOrS, tOrVt, tOrO_intra);
-        Tensor tOrO_intra_f16 = fp32_to_fp16(tOrO_intra);
-
-
-        // output debug info
-        Tensor O_intra = make_tensor(make_gmem_ptr<half_t>(o_intra_out + block_id * BLOCK * kHeadDim),
-                                 make_shape(Int<BLOCK>{}, Int<kHeadDim>{}), make_stride(Int<kHeadDim>{}, Int<1>{})); // d x d
-        Tensor gO_intra = thr_mma.partition_C(O_intra);
-        cute::copy(tOrO_intra_f16, gO_intra);
-
-        // Step3: compute o_inter
-        // 计算 o_inter = q @ kv -> BLOCK x d @ d x d = BLOCK x d
-        Tensor tCrO_inter = partition_fragment_C(mma, make_shape(Int<BLOCK>{}, Int<kHeadDim>{}));
-        cute::clear(tCrO_inter);
-
-        Tensor tBrKVt = thr_mma.partition_fragment_B(sKVt);
-
-        cute::copy(tBsKVt, tBrKVt);
-
-        Tensor tArQ_decay = make_tensor_like(tArQ);
-        clear(tArQ_decay);
-        cute::transform(q_decay_r, tArQ, tArQ_decay, multiply_op);
-
-        cute::gemm(mma, tArQ_decay, tBrKVt, tCrO_inter);
-
-        Tensor tCrO_inter_f16 = fp32_to_fp16(tCrO_inter);
-
-        // output debug info
-        Tensor O_inter = make_tensor(make_gmem_ptr<half_t>(o_inter_out + block_id * BLOCK * kHeadDim),
-                                 make_shape(Int<BLOCK>{}, Int<kHeadDim>{}), make_stride(Int<kHeadDim>{}, Int<1>{})); // d x d
-        Tensor gO_inter = thr_mma.partition_C(O_inter);
-        cute::copy(tCrO_inter_f16, gO_inter);
-
-
-        // Step 4: compute O = O_intra + O_inter
-        half_t half_one = half_t(1.0f);
-        cute::axpby(half_one, tOrO_intra_f16, half_one, tCrO_inter_f16);
-        // write O to global memory
-        Tensor tCgO = thr_mma.partition_C(gO);
-        cute::copy(tCrO_inter_f16, tCgO);
-
-        // TODO: figure out __syncthreads()放在什么地方合适，特别注意那种需要多个view进行计算的，比如smem_kv
-        __syncthreads();
-        // Step5: Update KV
-        // new_kv = tl.dot(k_t, v) d x BLOCK @ d x BLOCK = d x  d
-        // kv = kv * block_decay + new_kv, block_decay = 1.0
-        Tensor tAgKt = thr_mma.partition_A(gKt);
-        Tensor tArKt = thr_mma.partition_fragment_A(gKt);
-        Tensor tBgVt = thr_mma.partition_B(gVt);
-        Tensor tBrVt = thr_mma.partition_fragment_B(gVt);
-
-        cute::copy(tAgKt, tArKt);
-        cute::copy(tBgVt, tBrVt);
-
-        if (thread0()) {
-            // PRINT_TENSOR("tArKt tensor", tArKt);
-            PRINT("tArKt shape", tArKt);
-            print_tensor(tArKt);
-        }
-
-        Tensor tArKt_decay = make_tensor_like(tArKt);
-
-        clear(tArKt_decay);
+//        auto l = logical_divide(tCrS_fp16_decay.layout(), Shape<X, X, Int<2>>{});
+//        auto tOrS_laytout = make_layout(make_layout(get<0, 0>(l), get<0, 1>(l), get<2, 0>(l)), get<1>(l), get<2, 1>(l));
+//        Tensor tOrS = make_tensor(tCrS_fp16_decay.data(), tOrS_laytout);
+//
+//        Tensor tOgVt = thr_mma.partition_B(gVt);
+//        Tensor tOrVt = thr_mma.partition_fragment_B(gVt);
+//        cute::copy(tOgVt, tOrVt);
+//
+//        Tensor tOrO_intra = partition_fragment_C(mma, make_shape(Int<BLOCK>{}, Int<kHeadDim>{})); //BLOCK x d
+//        cute::clear(tOrO_intra);
+//
+//        cute::gemm(mma, tOrS, tOrVt, tOrO_intra);
+//        Tensor tOrO_intra_f16 = fp32_to_fp16(tOrO_intra);
+//
+//
+//        // output debug info
+//        Tensor O_intra = make_tensor(make_gmem_ptr<half_t>(o_intra_out + block_id * BLOCK * kHeadDim),
+//                                 make_shape(Int<BLOCK>{}, Int<kHeadDim>{}), make_stride(Int<kHeadDim>{}, Int<1>{})); // d x d
+//        Tensor gO_intra = thr_mma.partition_C(O_intra);
+//        cute::copy(tOrO_intra_f16, gO_intra);
+//
+//        // Step3: compute o_inter
+//        // 计算 o_inter = q @ kv -> BLOCK x d @ d x d = BLOCK x d
+//        Tensor tCrO_inter = partition_fragment_C(mma, make_shape(Int<BLOCK>{}, Int<kHeadDim>{}));
+//        cute::clear(tCrO_inter);
+//
+//        Tensor tBrKVt = thr_mma.partition_fragment_B(sKVt);
+//
+//        cute::copy(tBsKVt, tBrKVt);
+//
+//        Tensor tArQ_decay = make_tensor_like(tArQ);
+//        clear(tArQ_decay);
+//        cute::transform(q_decay_r, tArQ, tArQ_decay, multiply_op);
+//
+//        cute::gemm(mma, tArQ_decay, tBrKVt, tCrO_inter);
+//
+//        Tensor tCrO_inter_f16 = fp32_to_fp16(tCrO_inter);
+//
+//        // output debug info
+//        Tensor O_inter = make_tensor(make_gmem_ptr<half_t>(o_inter_out + block_id * BLOCK * kHeadDim),
+//                                 make_shape(Int<BLOCK>{}, Int<kHeadDim>{}), make_stride(Int<kHeadDim>{}, Int<1>{})); // d x d
+//        Tensor gO_inter = thr_mma.partition_C(O_inter);
+//        cute::copy(tCrO_inter_f16, gO_inter);
+//
+//
+//        // Step 4: compute O = O_intra + O_inter
+//        half_t half_one = half_t(1.0f);
+//        cute::axpby(half_one, tOrO_intra_f16, half_one, tCrO_inter_f16);
+//        // write O to global memory
+//        Tensor tCgO = thr_mma.partition_C(gO);
+//        cute::copy(tCrO_inter_f16, tCgO);
+//
+//        // TODO: figure out __syncthreads()放在什么地方合适，特别注意那种需要多个view进行计算的，比如smem_kv
+//        __syncthreads();
+//        // Step5: Update KV
+//        // new_kv = tl.dot(k_t, v) d x BLOCK @ d x BLOCK = d x  d
+//        // kv = kv * block_decay + new_kv, block_decay = 1.0
+//        Tensor tAgKt = thr_mma.partition_A(gKt);
+//        Tensor tArKt = thr_mma.partition_fragment_A(gKt);
+//        Tensor tBgVt = thr_mma.partition_B(gVt);
+//        Tensor tBrVt = thr_mma.partition_fragment_B(gVt);
+//
+//        cute::copy(tAgKt, tArKt);
+//        cute::copy(tBgVt, tBrVt);
+//
 //        if (thread0()) {
-//            PRINT_TENSOR("tArKt_decay tensor before", tArKt_decay);
+//            // PRINT_TENSOR("tArKt tensor", tArKt);
+//            PRINT("tArKt shape", tArKt);
+//            print_tensor(tArKt);
 //        }
-        cute::transform(kt_decay_r, tArKt, tArKt_decay, multiply_op);
-
-        Tensor tCrNewKV = thr_mma.partition_fragment_C(sKV);
-        Tensor tCsKV = thr_mma.partition_C(sKV);
-        clear(tCrNewKV);
-
-//        if (thread0()) {
-//          PRINT_TENSOR("tArKt_decay tensor", tArKt_decay);
-//        }
-
-        cute::gemm(mma, tArKt_decay, tBrVt, tCrNewKV);
-
-        Tensor tCrNewKV_f16 =  fp32_to_fp16(tCrNewKV);
-
-        cute::axpby(1.0f, tCrNewKV_f16, block_decay_r, tCsKV);
-
-
-        Tensor gKV = make_tensor(make_gmem_ptr<float>(kv_out + block_id * kHeadDim * kHeadDim),
-                                 make_shape(Int<kHeadDim>{}, Int<kHeadDim>{}), make_stride(Int<kHeadDim>{}, Int<1>{})); // d x d
-
-        Tensor tCgKV = thr_mma.partition_C(gKV);
-        // copy kv result to global
-        cute::copy(tCsKV, tCgKV);
-        __syncthreads();
+//
+//        Tensor tArKt_decay = make_tensor_like(tArKt);
+//
+//        clear(tArKt_decay);
+////        if (thread0()) {
+////            PRINT_TENSOR("tArKt_decay tensor before", tArKt_decay);
+////        }
+//        cute::transform(kt_decay_r, tArKt, tArKt_decay, multiply_op);
+//
+//        Tensor tCrNewKV = thr_mma.partition_fragment_C(sKV);
+//        Tensor tCsKV = thr_mma.partition_C(sKV);
+//        clear(tCrNewKV);
+//
+////        if (thread0()) {
+////          PRINT_TENSOR("tArKt_decay tensor", tArKt_decay);
+////        }
+//
+//        cute::gemm(mma, tArKt_decay, tBrVt, tCrNewKV);
+//
+//        Tensor tCrNewKV_f16 =  fp32_to_fp16(tCrNewKV);
+//
+//        cute::axpby(1.0f, tCrNewKV_f16, block_decay_r, tCsKV);
+//
+//
+//        Tensor gKV = make_tensor(make_gmem_ptr<float>(kv_out + block_id * kHeadDim * kHeadDim),
+//                                 make_shape(Int<kHeadDim>{}, Int<kHeadDim>{}), make_stride(Int<kHeadDim>{}, Int<1>{})); // d x d
+//
+//        Tensor tCgKV = thr_mma.partition_C(gKV);
+//        // copy kv result to global
+//        cute::copy(tCsKV, tCgKV);
+//        __syncthreads();
     }
 
 }
