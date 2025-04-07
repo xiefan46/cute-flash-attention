@@ -142,7 +142,8 @@ __forceinline__ __device__ auto load_decay_tensor_diag_block(const half_t* data_
 // 4. 给smem增加static check. 参考 https://github.com/NVIDIA/cutlass/blob/main/media/docs/cute/0x_gemm_tutorial.md
 
 // q [B, H, N, d] k  [B, H, N, d] v [B, H, N, d]
-// q_decay,k_decay,diag_decay, block_decay [H, BLOCK, d]
+// q_decay,k_decay, [H, BLOCK, d]
+// block_decay [H]
 template <typename config>
 __global__ void flash_forward(const half_t* q, const half_t* k, const half_t* v, half_t* o, const int B, const int H, const int N, float* kv_out,
                               half_t* o_inter_out, half_t* o_intra_out, half_t* q_decay, half_t* k_decay, half_t* diag_decay, half_t* block_decay) {

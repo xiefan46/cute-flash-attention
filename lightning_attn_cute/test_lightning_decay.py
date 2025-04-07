@@ -65,8 +65,9 @@ def set_seed(seed=42):
     os.environ['PYTHONHASHSEED'] = str(seed)
     os.environ['CUBLAS_WORKSPACE_CONFIG'] = ':4096:8'  # 针对某些CUDA操作
 
-def print_decay_tensors(q, BLOCK = 64):
+def print_decay_tensors(q, BLOCK = 128):
     num_attention_heads = q.size(1)
+    d = q.size(3)
     slope_rate = _build_slope_tensor(num_attention_heads).to(q.device)
     array = torch.arange(BLOCK).to(q) + 1
     q_decay = torch.exp(-slope_rate * array.reshape(-1, 1))
@@ -89,9 +90,9 @@ def print_decay_tensors(q, BLOCK = 64):
 
     print(f"k_decay: {k_decay}")
 
-    print(f"q_decay expend: {q_decay.expand(-1, -1, BLOCK)}")
+    print(f"q_decay expend: {q_decay.expand(-1, -1, d)}")
 
-    print(f"q_decay expend: {q_decay.expand(-1, -1, BLOCK)}")
+    print(f"q_decay expend: {q_decay.expand(-1, -1, d)}")
 
     print(f"diag_decay squeeze: {diag_decay.squeeze(dim=0).shape}")
 
