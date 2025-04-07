@@ -45,8 +45,8 @@ def lightning_attn_no_decay(
     kv = torch.zeros(B, H, d, d).to(torch.float32).to(q.device)
     kv_output = torch.zeros(NUM_BLOCK, d, d).to(kv.dtype).to(q.device)
 
-    o_inter_output = torch.zeros(NUM_BLOCK, BLOCK, d).to(torch.float32).to(q.device)
-    o_intra_output = torch.zeros(NUM_BLOCK, BLOCK, d).to(torch.float32).to(q.device)
+    o_inter_output = torch.zeros(NUM_BLOCK, BLOCK, d).to(torch.float16).to(q.device)
+    o_intra_output = torch.zeros(NUM_BLOCK, BLOCK, d).to(torch.float16).to(q.device)
     output = torch.empty((B, H, N, d), dtype=torch.float16, device=q.device)
 
     for i in range(NUM_BLOCK):
