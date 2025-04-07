@@ -177,11 +177,11 @@ def test_forward_with_decay(q, k, v, myflash):
 
     print(f"cute decay. q_decay_cute: {q_decay_cute}, k_decay_cute: {k_decay_cute}, diag_decay_cute: {diag_decay_cute}, block_decay_cute: {block_decay_cute}")
 
-    cute_output = myflash.forward_with_decay(q, k, v, q_decay_cute, k_decay_cute, diag_decay_cute, block_decay_cute)
+    out, kv_out, o_inter_out, o_intra_out = myflash.forward_with_decay(q, k, v, q_decay_cute, k_decay_cute, diag_decay_cute, block_decay_cute)
 
     torch.testing.assert_close(
         torch_output,
-        cute_output,
+        out,
         rtol=1e-3,
         atol=1e-2,
         msg="Lightning attention implementations produce different results",
