@@ -146,8 +146,8 @@ def test_forward_with_decay(q, k, v, myflash):
     BLOCK = 64
     array = torch.arange(BLOCK).to(q) + 1
     slope_rate = _build_slope_tensor(H).to(q.device)
-    q_decay = torch.exp(-slope_rate * array.reshape(-1, 1))
-    k_decay = torch.exp(-slope_rate * (BLOCK - array.reshape(-1, 1)))
+    q_decay = torch.exp(-slope_rate * array.reshape(-1, 1)).to(torch.float16)
+    k_decay = torch.exp(-slope_rate * (BLOCK - array.reshape(-1, 1))).to(torch.float16)
     index = array[:, None] - array[None, :]
     s_index = (
             slope_rate
@@ -157,20 +157,20 @@ def test_forward_with_decay(q, k, v, myflash):
             ]
     )
     s_index = torch.where(index >= 0, -s_index, float("-inf"))
-    diag_decay = torch.exp(s_index)
-    block_decay = torch.exp(-slope_rate * BLOCK)
+    diag_decay = torch.exp(s_index).to(torch.float16)
+    block_decay = torch.exp(-slope_rate * BLOCK).to(torch.float16)
 
     torch_output = torch_lightning_attn(q, k, v, q_decay, k_decay, diag_decay, block_decay, BLOCK)
 
-    q_decay_cute = q_decay.expand(-1, -1, d)
-    k_decay_cute = k_decay.expand(-1, -1, d)
-    diag_decay_cute = diag_decay.squeeze(dim=0)
-    block_decay_cute = block_decay.expand(-1, BLOCK, d)
+    q_decay_cute = q_decay.expand(-1, -1, d).to(torch.float16)
+    k_decay_cute = k_decay.expand(-1, -1, d).to(torch.float16)
+    diag_decay_cute = diag_decay.squeeze(dim=0).to(torch.float16)
+    block_decay_cute = block_decay.expand(-1, BLOCK, d).to(torch.float32)
 
     assert q_decay_cute.shape == (H, BLOCK, d)
     assert k_decay_cute.shape == (H, BLOCK, d)
-    assert diag_decay_cute.shape == (H, BLOCK, d)
-    assert block_decay_cute.shape == (H, BLOCK, d)
+    assert diag_decay_cute.shape == (H, BLOCK, BLOCK)
+    assert block_decay_cute.shape == (H)
 
     cute_output = myflash.forward_with_decay(q, k, v, q_decay_cute, k_decay_cute, diag_decay_cute, block_decay_cute)
 
