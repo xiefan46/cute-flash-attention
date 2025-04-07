@@ -158,7 +158,7 @@ def test_forward_with_decay(q, k, v, myflash):
     )
     s_index = torch.where(index >= 0, -s_index, float("-inf"))
     diag_decay = torch.exp(s_index).to(torch.float16)
-    block_decay = torch.exp(-slope_rate * BLOCK).to(torch.float16)
+    block_decay = torch.exp(-slope_rate * BLOCK).to(torch.float32)
 
     torch_output = torch_lightning_attn(q, k, v, q_decay, k_decay, diag_decay, block_decay, BLOCK)
 
