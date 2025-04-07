@@ -250,7 +250,8 @@ __global__ void flash_forward(const half_t* q, const half_t* k, const half_t* v,
         cute::transform(diag_decay_r, tCrS_fp16, tCrS_fp16_decay, multiply_op);
 
         if (thread0()) {
-          PRINT_TENSOR("tCrS_fp16_decay", tCrS_fp16_decay)
+          // PRINT_TENSOR("tCrS_fp16_decay", tCrS_fp16_decay)
+          PRINT("tCrS_fp16_decay", tCrS_fp16_decay);
         }
 
         // Step 2: compute O_intra
