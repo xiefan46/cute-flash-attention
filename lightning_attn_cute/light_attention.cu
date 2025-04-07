@@ -212,6 +212,11 @@ __global__ void flash_forward(const half_t* q, const half_t* k, const half_t* v,
         return a + b;
     };
 
+    for (int i = tx; i < kHeadDim * kHeadDim; i += blockDim.x) {
+        smem_kv[i] = 0.0f; // 正确初始化为float类型
+    }
+    __syncthreads();
+
     for (int block_id = 0; block_id < num_block; block_id++) {
         Tensor gQ = local_tile(Q, make_tile(Int<BLOCK>{}, Int<kHeadDim>{}), make_coord(block_id, 0)); //BLOCK x d
         Tensor gK = local_tile(K, make_tile(Int<BLOCK>{}, Int<kHeadDim>{}), make_coord(block_id, 0)); //BLOCK x d
@@ -241,6 +246,7 @@ __global__ void flash_forward(const half_t* q, const half_t* k, const half_t* v,
         Tensor tCrS_fp16_decay = make_tensor_like(tCrS_fp16);
         clear(tCrS_fp16_decay);
         assert(diag_decay_r.layout() == tCrS_fp16.layout());
+        assert(diag_decay_r.layout() == tCrS_fp16_decay.layout());
         cute::transform(diag_decay_r, tCrS_fp16, tCrS_fp16_decay, multiply_op);
 
         if (thread0()) {
