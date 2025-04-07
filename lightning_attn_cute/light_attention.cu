@@ -203,6 +203,7 @@ __global__ void flash_forward(const half_t* q, const half_t* k, const half_t* v,
         PRINT("block_decay_r", block_decay_r);
         PRINT("block_decay 1", block_decay[1]);
         PRINT("block_decay 15", block_decay[15]);
+        printf("block decay 0 printf = %f\n", block_decay_r);
     }
 
     auto multiply_op = [] (auto a, auto b) {
