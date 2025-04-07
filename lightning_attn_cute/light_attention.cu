@@ -201,6 +201,8 @@ __global__ void flash_forward(const half_t* q, const half_t* k, const half_t* v,
         PRINT("k_decay_r", k_decay_r);
         PRINT("diag_decay_r", diag_decay_r);
         PRINT("block_decay_r", block_decay_r);
+        PRINT("block_decay 1", block_decay[1]);
+        PRINT("block_decay 15", block_decay[15]);
     }
 
     auto multiply_op = [] (auto a, auto b) {
