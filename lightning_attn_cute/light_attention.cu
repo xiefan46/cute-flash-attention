@@ -243,7 +243,7 @@ __global__ void flash_forward(const half_t* q, const half_t* k, const half_t* v,
           PRINT_TENSOR("tCrS_fp16", tCrS_fp16);
         }
 
-        Tensor tCrS_fp16_decay = make_tensor_like(tCrS_fp16);
+        auto tCrS_fp16_decay = make_tensor_like(tCrS_fp16);
         // clear(tCrS_fp16_decay);
         // assert(diag_decay_r.layout() == tCrS_fp16.layout());
         assert(diag_decay_r.layout() == tCrS_fp16_decay.layout());
