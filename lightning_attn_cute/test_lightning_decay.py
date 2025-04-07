@@ -235,6 +235,6 @@ if __name__ == "__main__":
     k1 = k.transpose(1, 2).contiguous()
     v1 = v.transpose(1, 2).contiguous()
 
-    print_decay_tensors(q1)
+    # print_decay_tensors(q1)
 
-    # test_forward_with_decay(q1, k1, v1, myflash)
+    test_forward_with_decay(q1, k1, v1, myflash)
