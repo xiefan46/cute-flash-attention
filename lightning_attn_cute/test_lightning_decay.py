@@ -175,6 +175,8 @@ def test_forward_with_decay(q, k, v, myflash):
     diag_decay_cute = diag_decay.squeeze(dim=0).to(torch.float16)
 
     block_decay_cute = block_decay.squeeze().to(torch.float32)
+    if block_decay_cute.dim() == 0:
+        block_decay_cute = block_decay_cute.unsqueeze(0)
     print(f"block_decay_cute shape: {block_decay_cute.shape}")
     print(f"H: {H}")
 
@@ -186,8 +188,6 @@ def test_forward_with_decay(q, k, v, myflash):
     print(f"cute decay. q_decay_cute: {q_decay_cute}, k_decay_cute: {k_decay_cute}, diag_decay_cute: {diag_decay_cute}, block_decay_cute: {block_decay_cute}")
 
     cute_output, cute_kv_output, cute_o_inter_out, cute_o_intra_out = myflash.forward_with_decay(q, k, v, q_decay_cute, k_decay_cute, diag_decay_cute, block_decay_cute)
-
-
 
     for i in range(num_block):
         print(f"torch_kv_output shape: {torch_kv_output[i].shape}")
@@ -226,8 +226,6 @@ def test_forward_with_decay(q, k, v, myflash):
             msg=f"block : {i},  o inter results are different. torch_o_inter_out: {torch_o_inter_out[i]}, cute_o_inter_out: {cute_o_inter_out[i]}",
         )
     print("✅ o inter result matches")
-
-
 
 
     for i in range(num_block):
