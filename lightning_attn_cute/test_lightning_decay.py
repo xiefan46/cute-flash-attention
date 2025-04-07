@@ -203,20 +203,20 @@ if __name__ == "__main__":
 
     torch.manual_seed(0)
     # Load the CUDA kernel as a python module
-    myflash = load(name='myflash',
-                   sources=[
-                       'main.cpp',
-                       'light_attn_decay.cu',
-                   ],
-                   extra_cuda_cflags=[
-                       '-O2',
-                       '-lcublas',
-                       '-lcublasLt',
-                       '-std=c++17',
-                       '-I/root/cutlass/include',
-                       '-I/root/cutlass/tools/util/include',
-                   ],
-                   )
+    # myflash = load(name='myflash',
+    #                sources=[
+    #                    'main.cpp',
+    #                    'light_attn_decay.cu',
+    #                ],
+    #                extra_cuda_cflags=[
+    #                    '-O2',
+    #                    '-lcublas',
+    #                    '-lcublasLt',
+    #                    '-std=c++17',
+    #                    '-I/root/cutlass/include',
+    #                    '-I/root/cutlass/tools/util/include',
+    #                ],
+    #                )
 
 
     set_seed(10086)
@@ -234,5 +234,6 @@ if __name__ == "__main__":
     k1 = k.transpose(1, 2).contiguous()
     v1 = v.transpose(1, 2).contiguous()
 
+    print_decay_tensors(q1)
 
-    test_forward_with_decay(q1, k1, v1, myflash)
+    # test_forward_with_decay(q1, k1, v1, myflash)
