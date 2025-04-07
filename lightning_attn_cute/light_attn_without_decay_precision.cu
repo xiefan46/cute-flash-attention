@@ -96,7 +96,7 @@ __forceinline__ __device__ auto fp32_to_fp16(Tensor& src_fp32) {
 // 4. 给smem增加static check. 参考 https://github.com/NVIDIA/cutlass/blob/main/media/docs/cute/0x_gemm_tutorial.md
 template <typename config>
 __global__ void flash_forward(const half_t* q, const half_t* k, const half_t* v, half_t* o, const int B, const int H, const int N, float* kv_out,
-                              float* o_inter_out, float* o_intra_out) {
+                              half_t* o_inter_out, half_t* o_intra_out) {
   using namespace cute;
   using TiledMMA = typename config::TiledMMA;
 
@@ -147,7 +147,7 @@ __global__ void flash_forward(const half_t* q, const half_t* k, const half_t* v,
     Tensor gVt = local_tile(Vt, make_tile(Int<kHeadDim>{}, Int<BLOCK>{}), make_coord(0, block_id)); //d x BLOCK
     Tensor gO = local_tile(O, make_tile(Int<BLOCK>{}, Int<kHeadDim>{}), make_coord(block_id, 0));
 
-
+    // Step 1: compute S
     // compute q @ k.T BLOCK x BLOCK
     Tensor tAgQ = thr_mma.partition_A(gQ);
     Tensor tArQ = thr_mma.partition_fragment_A(gQ);
@@ -158,20 +158,18 @@ __global__ void flash_forward(const half_t* q, const half_t* k, const half_t* v,
     Tensor tCrS = partition_fragment_C(mma, make_shape(Int<BLOCK>{}, Int<BLOCK>{}));
     clear(tCrS);
 
-
-	__syncthreads();
-
     cute::gemm(mma, tArQ, tBrK, tCrS);
 
     auto tCrS_fp16 = fp32_to_fp16(tCrS);
 
+    // Step 2: compute O_intra
     // 将tCrS_f16转换为A layout，并且进行第二个gemm的计算
     // ((_2,_2),_4,_8) -> ((_2,_2),_4, (2, 4)) ->  -> ((2, 2, 2), 4, 4)
     auto l = logical_divide(tCrS_fp16.layout(), Shape<X, X, Int<2>>{});
     auto tOrS_laytout = make_layout(make_layout(get<0, 0>(l), get<0, 1>(l), get<2, 0>(l)), get<1>(l), get<2, 1>(l));
     Tensor tOrS = make_tensor(tCrS_fp16.data(), tOrS_laytout);
 
-	Tensor tOgVt = thr_mma.partition_B(gVt);
+	  Tensor tOgVt = thr_mma.partition_B(gVt);
     Tensor tOrVt = thr_mma.partition_fragment_B(gVt);
     cute::copy(tOgVt, tOrVt);
 
@@ -179,13 +177,16 @@ __global__ void flash_forward(const half_t* q, const half_t* k, const half_t* v,
     cute::clear(tOrO_intra);
 
     cute::gemm(mma, tOrS, tOrVt, tOrO_intra);
+    Tensor tOrO_intra_f16 = fp32_to_fp16(tOrO_intra);
+
 
     // output debug info
-    Tensor O_intra = make_tensor(make_gmem_ptr<float>(o_intra_out + block_id * BLOCK * kHeadDim),
+    Tensor O_intra = make_tensor(make_gmem_ptr<half_t>(o_intra_out + block_id * BLOCK * kHeadDim),
                              make_shape(Int<BLOCK>{}, Int<kHeadDim>{}), make_stride(Int<kHeadDim>{}, Int<1>{})); // d x d
     Tensor gO_intra = thr_mma.partition_C(O_intra);
-    cute::copy(tOrO_intra, gO_intra);
+    cute::copy(tOrO_intra_f16, gO_intra);
 
+    // Step3: compute o_inter
     // 计算 o_inter = q @ kv -> BLOCK x d @ d x d = BLOCK x d
     Tensor tCrO_inter = partition_fragment_C(mma, make_shape(Int<BLOCK>{}, Int<kHeadDim>{}));
     cute::clear(tCrO_inter);
@@ -194,31 +195,26 @@ __global__ void flash_forward(const half_t* q, const half_t* k, const half_t* v,
 
     cute::copy(tBsKVt, tBrKVt);
 
-//    if (thread0()) {
-//      PRINT("tBrKVt", tBrKVt);
-//    }
-
     cute::gemm(mma, tArQ, tBrKVt, tCrO_inter);
 
+    Tensor tCrO_inter_f16 = fp32_to_fp16(tCrO_inter);
+
     // output debug info
-    Tensor O_inter = make_tensor(make_gmem_ptr<float>(o_inter_out + block_id * BLOCK * kHeadDim),
+    Tensor O_inter = make_tensor(make_gmem_ptr<half_t>(o_inter_out + block_id * BLOCK * kHeadDim),
                              make_shape(Int<BLOCK>{}, Int<kHeadDim>{}), make_stride(Int<kHeadDim>{}, Int<1>{})); // d x d
     Tensor gO_inter = thr_mma.partition_C(O_inter);
-    cute::copy(tCrO_inter, gO_inter);
+    cute::copy(tCrO_inter_f16, gO_inter);
 
 
-//    if (thread0()) {
-//      PRINT_TENSOR("tCrO_inter", tCrO_inter(_, 0, 0));
-//    }
-
-    // O = O_intra + O_inter
-    cute::axpby(1.0, tOrO_intra, 1.0, tCrO_inter);
+    // Step 4: compute O = O_intra + O_inter
+    half_t half_one = half_t(1.0f);
+    cute::axpby(half_one, tOrO_intra_f16, half_one, tCrO_inter_f16);
     // write O to global memory
     Tensor tCgO = thr_mma.partition_C(gO);
-    cute::copy(tCrO_inter, tCgO);
-    __syncthreads();
+    cute::copy(tCrO_inter_f16, tCgO);
 
-    // Update KV
+
+    // Step5: Update KV
     // new_kv = tl.dot(k_t, v) d x BLOCK @ d x BLOCK = d x  d
     // kv = kv * block_decay + new_kv, block_decay = 1.0
     Tensor tAgKt = thr_mma.partition_A(gKt);
@@ -233,7 +229,10 @@ __global__ void flash_forward(const half_t* q, const half_t* k, const half_t* v,
     Tensor tCsKV = thr_mma.partition_C(sKV);
     clear(tCrNewKV);
     cute::gemm(mma, tArKt, tBrVt, tCrNewKV);
-    cute::axpby(1.0, tCrNewKV, 1.0, tCsKV);
+
+    Tensor tCrNewKV_f16 =  fp32_to_fp16(tCrNewKV);
+
+    cute::axpby(1.0f, tCrNewKV_f16, 1.0f, tCsKV);
 
 
     Tensor gKV = make_tensor(make_gmem_ptr<float>(kv_out + block_id * kHeadDim * kHeadDim),
@@ -264,8 +263,8 @@ std::tuple<torch::Tensor, torch::Tensor, torch::Tensor, torch::Tensor> forward_w
 
   auto kv_out = torch::zeros({num_block, d, d}, torch::TensorOptions().dtype(torch::kFloat32).device(torch::Device(torch::kCUDA, 0)));
 
-  auto o_inter_out = torch::zeros({num_block, BLOCK, d}, torch::TensorOptions().dtype(torch::kFloat32).device(torch::Device(torch::kCUDA, 0)));
-  auto o_intra_out = torch::zeros({num_block, BLOCK, d}, torch::TensorOptions().dtype(torch::kFloat32).device(torch::Device(torch::kCUDA, 0)));
+  auto o_inter_out = torch::zeros({num_block, BLOCK, d}, torch::TensorOptions().dtype(torch::kFloat16).device(torch::Device(torch::kCUDA, 0)));
+  auto o_intra_out = torch::zeros({num_block, BLOCK, d}, torch::TensorOptions().dtype(torch::kFloat16).device(torch::Device(torch::kCUDA, 0)));
 
   auto out = torch::empty_like(q);
 

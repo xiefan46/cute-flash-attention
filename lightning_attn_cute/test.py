@@ -434,6 +434,6 @@ if __name__ == "__main__":
     k1 = k.transpose(1, 2).contiguous()
     v1 = v.transpose(1, 2).contiguous()
 
-    # test_forward_without_decay_precision(q1, k1, v1)
+    test_forward_without_decay_precision(q1, k1, v1)
     # test_kv_match(k1, v1, myflash)
-    test_kv_match_amp(k1, v1, myflash)
+    # test_kv_match_amp(k1, v1, myflash)

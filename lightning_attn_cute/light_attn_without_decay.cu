@@ -175,6 +175,7 @@ __global__ void flash_forward(const half_t* q, const half_t* k, const half_t* v,
     cute::clear(tOrO_intra);
 
     cute::gemm(mma, tOrS, tOrVt, tOrO_intra);
+    Tensor tOrO_intra_f16 = fp32_to_fp16(tOrO_intra);
 
     // 计算 o_inter = q @ kv -> BLOCK x d @ d x d = BLOCK x d
 
@@ -190,17 +191,19 @@ __global__ void flash_forward(const half_t* q, const half_t* k, const half_t* v,
 //    }
 
     cute::gemm(mma, tArQ, tBrKVt, tCrO_inter);
+    Tensor tCrO_inter_f16 = fp32_to_fp16(tCrO_inter);
 
 //    if (thread0()) {
 //      PRINT_TENSOR("tCrO_inter", tCrO_inter(_, 0, 0));
 //    }
 
+    // TODO: 需要确认torch elementwise add的时候acc是fp16还是32
     // O = O_intra + O_inter
-    cute::axpby(1.0, tOrO_intra, 1.0, tCrO_inter);
+    half_t half_one = half_t(1.0f);
+    cute::axpby(half_one, tOrO_intra, half_one, tCrO_inter);
     // write O to global memory
     Tensor tCgO = thr_mma.partition_C(gO);
     cute::copy(tCrO_inter, tCgO);
-    __syncthreads();
 
     // Update KV
     // new_kv = tl.dot(k_t, v) d x BLOCK @ d x BLOCK = d x  d
@@ -217,11 +220,9 @@ __global__ void flash_forward(const half_t* q, const half_t* k, const half_t* v,
     Tensor tCsKV = thr_mma.partition_C(sKV);
     clear(tCrNewKV);
     cute::gemm(mma, tArKt, tBrVt, tCrNewKV);
-    cute::axpby(1.0, tCrNewKV, 1.0, tCsKV);
+    Tensor tCrNewKV_f16 = fp32_to_fp16(tCrNewKV);
+    cute::axpby(1.0f, tCrNewKV_f16, 1.0f, tCsKV);
   }
-
-
-  // Tensor OKV = make_tensor(make_gmem_ptr<half_t>(o_kv + bs_head_offset), make_shape(Int<kHeadDim>{}, Int<kHeadDim>{}), make_stride(Int<kHeadDim>{}, Int<1>{})); // d x d
 
 }
 
