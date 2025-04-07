@@ -52,10 +52,10 @@ def lightning_attn_no_decay(
     for i in range(NUM_BLOCK):
         si = i * BLOCK
         ei = min(si + BLOCK, N)
-        qi = q[:, :, si:ei].contiguous().to(torch.float32)
-        ki = k[:, :, si:ei].contiguous().to(torch.float32)
-        vi = v[:, :, si:ei].contiguous().to(torch.float32)
-        qkv_none_diag = torch.matmul(qi, kv)
+        qi = q[:, :, si:ei].contiguous()
+        ki = k[:, :, si:ei].contiguous()
+        vi = v[:, :, si:ei].contiguous()
+        qkv_none_diag = torch.matmul(qi, kv.to(torch.float16))
         o_inter_output[i] = qkv_none_diag.detach().clone()
 
 

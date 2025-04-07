@@ -278,7 +278,7 @@ std::tuple<torch::Tensor, torch::Tensor, torch::Tensor, torch::Tensor> forward_w
 
   partition_kernel<<<grid, block>>>((cute::half_t*)q.data_ptr(), (cute::half_t*)k.data_ptr(),
                                               (cute::half_t*)v.data_ptr(), (cute::half_t*)out.data_ptr(), B, H, N, (float*)kv_out.data_ptr(),
-                                    (float*)o_inter_out.data_ptr(), (float*)o_intra_out.data_ptr());
+                                    (cute::half_t*)o_inter_out.data_ptr(), (cute::half_t*)o_intra_out.data_ptr());
 
   cudaDeviceSynchronize();
   return std::make_tuple(out, kv_out, o_inter_out, o_intra_out);
