@@ -244,10 +244,10 @@ __global__ void flash_forward(const half_t* q, const half_t* k, const half_t* v,
         }
 
         Tensor tCrS_fp16_decay = make_tensor_like(tCrS_fp16);
-        clear(tCrS_fp16_decay);
-        assert(diag_decay_r.layout() == tCrS_fp16.layout());
+        // clear(tCrS_fp16_decay);
+        // assert(diag_decay_r.layout() == tCrS_fp16.layout());
         assert(diag_decay_r.layout() == tCrS_fp16_decay.layout());
-        cute::transform(diag_decay_r, tCrS_fp16, tCrS_fp16_decay, multiply_op);
+        cute::transform(diag_decay_r, tCrS_fp16_decay, tCrS_fp16_decay, multiply_op);
 
         if (thread0()) {
           // PRINT_TENSOR("tCrS_fp16_decay", tCrS_fp16_decay)
