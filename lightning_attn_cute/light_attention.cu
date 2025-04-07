@@ -217,76 +217,53 @@ __global__ void flash_forward(const half_t* q, const half_t* k, const half_t* v,
     }
     __syncthreads();
 
-    Tensor gQ = local_tile(Q, make_tile(Int<BLOCK>{}, Int<kHeadDim>{}), make_coord(0, 0)); //BLOCK x d
-    Tensor gK = local_tile(K, make_tile(Int<BLOCK>{}, Int<kHeadDim>{}), make_coord(0, 0)); //BLOCK x d
-    Tensor gKt = local_tile(Kt, make_tile(Int<kHeadDim>{}, Int<BLOCK>{}), make_coord(0, 0)); // d x BLOCK
-    Tensor gVt = local_tile(Vt, make_tile(Int<kHeadDim>{}, Int<BLOCK>{}), make_coord(0, 0)); //d x BLOCK
-    Tensor gO = local_tile(O, make_tile(Int<BLOCK>{}, Int<kHeadDim>{}), make_coord(0, 0));
-
-    // Step 1: compute S
-    // compute q @ k.T BLOCK x BLOCK
-    Tensor tAgQ = thr_mma.partition_A(gQ);
-    Tensor tArQ = thr_mma.partition_fragment_A(gQ);
-    Tensor tBgK = thr_mma.partition_B(gK);
-    Tensor tBrK = thr_mma.partition_fragment_B(gK);
-    cute::copy(tAgQ, tArQ);
-    cute::copy(tBgK, tBrK);
-    Tensor tCrS = partition_fragment_C(mma, make_shape(Int<BLOCK>{}, Int<BLOCK>{}));
-    clear(tCrS);
-
-    cute::gemm(mma, tArQ, tBrK, tCrS);
-
-    if (thread0()) {
-        // print_tensor(tCrS);
-        PRINT("tCrS", tCrS)
-    }
-
+    constexpr int block_id = 0;
 //    for (int block_id = 0; block_id < num_block; block_id++) {
-//        Tensor gQ = local_tile(Q, make_tile(Int<BLOCK>{}, Int<kHeadDim>{}), make_coord(block_id, 0)); //BLOCK x d
-//        Tensor gK = local_tile(K, make_tile(Int<BLOCK>{}, Int<kHeadDim>{}), make_coord(block_id, 0)); //BLOCK x d
-//        Tensor gKt = local_tile(Kt, make_tile(Int<kHeadDim>{}, Int<BLOCK>{}), make_coord(0, block_id)); // d x BLOCK
-//        Tensor gVt = local_tile(Vt, make_tile(Int<kHeadDim>{}, Int<BLOCK>{}), make_coord(0, block_id)); //d x BLOCK
-//        Tensor gO = local_tile(O, make_tile(Int<BLOCK>{}, Int<kHeadDim>{}), make_coord(block_id, 0));
-//
-//        // Step 1: compute S
-//        // compute q @ k.T BLOCK x BLOCK
-//        Tensor tAgQ = thr_mma.partition_A(gQ);
-//        Tensor tArQ = thr_mma.partition_fragment_A(gQ);
-//        Tensor tBgK = thr_mma.partition_B(gK);
-//        Tensor tBrK = thr_mma.partition_fragment_B(gK);
-//        cute::copy(tAgQ, tArQ);
-//        cute::copy(tBgK, tBrK);
-//        Tensor tCrS = partition_fragment_C(mma, make_shape(Int<BLOCK>{}, Int<BLOCK>{}));
-//        clear(tCrS);
-//
-//        cute::gemm(mma, tArQ, tBrK, tCrS);
-//
-//        if (thread0()) {
-//            // print_tensor(tCrS);
-//            PRINT("tCrS", tCrS)
-//        }
+        Tensor gQ = local_tile(Q, make_tile(Int<BLOCK>{}, Int<kHeadDim>{}), make_coord(block_id, 0)); //BLOCK x d
+        Tensor gK = local_tile(K, make_tile(Int<BLOCK>{}, Int<kHeadDim>{}), make_coord(block_id, 0)); //BLOCK x d
+        Tensor gKt = local_tile(Kt, make_tile(Int<kHeadDim>{}, Int<BLOCK>{}), make_coord(0, block_id)); // d x BLOCK
+        Tensor gVt = local_tile(Vt, make_tile(Int<kHeadDim>{}, Int<BLOCK>{}), make_coord(0, block_id)); //d x BLOCK
+        Tensor gO = local_tile(O, make_tile(Int<BLOCK>{}, Int<kHeadDim>{}), make_coord(block_id, 0));
 
-//        Tensor tCrS_fp16 = fp32_to_fp16(tCrS);
-//
-//        if (thread0()) {
-//          PRINT_TENSOR("tCrS_fp16", tCrS_fp16);
-//        }
+        // Step 1: compute S
+        // compute q @ k.T BLOCK x BLOCK
+        Tensor tAgQ = thr_mma.partition_A(gQ);
+        Tensor tArQ = thr_mma.partition_fragment_A(gQ);
+        Tensor tBgK = thr_mma.partition_B(gK);
+        Tensor tBrK = thr_mma.partition_fragment_B(gK);
+        cute::copy(tAgQ, tArQ);
+        cute::copy(tBgK, tBrK);
+        Tensor tCrS = partition_fragment_C(mma, make_shape(Int<BLOCK>{}, Int<BLOCK>{}));
+        clear(tCrS);
 
-//        Tensor tCrS_fp16_decay = make_tensor_like(tCrS_fp16);
-//        // clear(tCrS_fp16_decay);
-//        // assert(diag_decay_r.layout() == tCrS_fp16.layout());
-//        assert(diag_decay_r.layout() == tCrS_fp16_decay.layout());
-//        cute::transform(diag_decay_r, tCrS_fp16_decay, tCrS_fp16_decay, multiply_op);
+        cute::gemm(mma, tArQ, tBrK, tCrS);
 
-//        if (thread0()) {
-//          // PRINT_TENSOR("tCrS_fp16_decay", tCrS_fp16_decay)
-//          PRINT("tCrS_fp16_decay", tCrS_fp16_decay);
-//        }
+        if (thread0()) {
+            // print_tensor(tCrS);
+            PRINT("tCrS", tCrS)
+        }
 
-//        cute::transform(diag_decay_r, tCrS_fp16, tCrS_fp16, multiply_op);
-//        if (thread0()) {
-//            PRINT_TENSOR("tCrS_fp16", tCrS_fp16)
-//        }
+        Tensor tCrS_fp16 = fp32_to_fp16(tCrS);
+
+        if (thread0()) {
+          PRINT_TENSOR("tCrS_fp16", tCrS_fp16);
+        }
+
+        Tensor tCrS_fp16_decay = make_tensor_like(tCrS_fp16);
+        // clear(tCrS_fp16_decay);
+        // assert(diag_decay_r.layout() == tCrS_fp16.layout());
+        assert(diag_decay_r.layout() == tCrS_fp16_decay.layout());
+        cute::transform(diag_decay_r, tCrS_fp16_decay, tCrS_fp16_decay, multiply_op);
+
+        if (thread0()) {
+          // PRINT_TENSOR("tCrS_fp16_decay", tCrS_fp16_decay)
+          PRINT("tCrS_fp16_decay", tCrS_fp16_decay);
+        }
+
+        cute::transform(diag_decay_r, tCrS_fp16, tCrS_fp16, multiply_op);
+        if (thread0()) {
+            PRINT_TENSOR("tCrS_fp16", tCrS_fp16)
+        }
 
         // Step 2: compute O_intra
         // 将tCrS_f16转换为A layout，并且进行第二个gemm的计算
@@ -392,7 +369,7 @@ __global__ void flash_forward(const half_t* q, const half_t* k, const half_t* v,
 //        // copy kv result to global
 //        cute::copy(tCsKV, tCgKV);
 //        __syncthreads();
-    // }
+    // } // end of for loop
 
 }
 
