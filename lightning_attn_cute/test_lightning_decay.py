@@ -165,7 +165,9 @@ def test_forward_with_decay(q, k, v, myflash):
     q_decay_cute = q_decay.expand(-1, -1, d).to(torch.float16)
     k_decay_cute = k_decay.expand(-1, -1, d).to(torch.float16)
     diag_decay_cute = diag_decay.squeeze(dim=0).to(torch.float16)
+
     block_decay_cute = block_decay.squeeze().to(torch.float32)
+    print(f"block_decay_cute shape: {block_decay_cute.shape}")
 
     assert q_decay_cute.shape == (H, BLOCK, d)
     assert k_decay_cute.shape == (H, BLOCK, d)
