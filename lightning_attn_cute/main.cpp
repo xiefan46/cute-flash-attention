@@ -8,6 +8,6 @@ std::tuple<torch::Tensor, torch::Tensor, torch::Tensor, torch::Tensor> forward_w
 
 
 PYBIND11_MODULE(TORCH_EXTENSION_NAME, m) {
-  m.def("forward_with_decay", torch::wrap_pybind_function(forward_wit_decay), "forward_wit_decay");
+  m.def("forward_with_decay", torch::wrap_pybind_function(forward_with_decay), "forward_with_decay");
   m.def("forward_without_decay_precision", torch::wrap_pybind_function(forward_without_decay_precision), "forward_without_decay_precision");
 }
