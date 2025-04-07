@@ -307,7 +307,8 @@ __global__ void flash_forward(const half_t* q, const half_t* k, const half_t* v,
 
         if (thread0()) {
             // PRINT_TENSOR("tArKt tensor", tArKt);
-            PRINT("tArKt", tArKt);
+            PRINT("tArKt shape", tArKt);
+            print_tensor(tArKt);
         }
 
         Tensor tArKt_decay = make_tensor_like(tArKt);
