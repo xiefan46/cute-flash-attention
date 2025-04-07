@@ -210,6 +210,8 @@ def test_forward_without_decay_precision(q, k, v):
     for i in range(num_block):
         print(f"torch_o_intra_out shape: {torch_o_intra_out[i].shape}")
         print(f"cute_o_intra_out shape: {cute_o_intra_out[i].shape}")
+        print(f"torch_o_intra_out dtype/device: {torch_o_intra_out[i].dtype} device: {torch_o_intra_out[i].device}")
+        print(f"cute_o_intra_out dtype/device: {cute_o_intra_out[i].dtype}, device: {cute_o_intra_out[i].device}")
         torch.testing.assert_close(
             torch_o_intra_out[i],
             cute_o_intra_out[i],
