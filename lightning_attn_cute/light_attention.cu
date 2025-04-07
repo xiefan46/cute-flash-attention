@@ -237,11 +237,15 @@ __global__ void flash_forward(const half_t* q, const half_t* k, const half_t* v,
 
         cute::gemm(mma, tArQ, tBrK, tCrS);
 
-        Tensor tCrS_fp16 = fp32_to_fp16(tCrS);
-
         if (thread0()) {
-          PRINT_TENSOR("tCrS_fp16", tCrS_fp16);
+            PRINT_TENSOR("tCrS", tCrS);
         }
+
+//        Tensor tCrS_fp16 = fp32_to_fp16(tCrS);
+//
+//        if (thread0()) {
+//          PRINT_TENSOR("tCrS_fp16", tCrS_fp16);
+//        }
 
 //        Tensor tCrS_fp16_decay = make_tensor_like(tCrS_fp16);
 //        // clear(tCrS_fp16_decay);
