@@ -188,7 +188,6 @@ def test_forward_with_decay(q, k, v, myflash):
         out,
         rtol=1e-3,
         atol=1e-2,
-        msg="Lightning attention implementations produce different results",
     )
 
     print("✅ Two implementations match")
