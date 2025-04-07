@@ -238,7 +238,7 @@ __global__ void flash_forward(const half_t* q, const half_t* k, const half_t* v,
         cute::gemm(mma, tArQ, tBrK, tCrS);
 
         if (thread0()) {
-            print_tensor("tCrS", tCrS);
+            print_tensor(tCrS);
         }
 
 //        Tensor tCrS_fp16 = fp32_to_fp16(tCrS);
