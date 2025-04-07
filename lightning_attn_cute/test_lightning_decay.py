@@ -179,7 +179,9 @@ def test_forward_with_decay(q, k, v, myflash):
 
     out, kv_out, o_inter_out, o_intra_out = myflash.forward_with_decay(q, k, v, q_decay_cute, k_decay_cute, diag_decay_cute, block_decay_cute)
 
+    print(f"torch out: {torch_output}")
     print(f"cute out: {out}")
+
 
     torch.testing.assert_close(
         torch_output,
