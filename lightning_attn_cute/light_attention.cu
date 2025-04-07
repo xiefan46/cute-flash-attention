@@ -101,16 +101,16 @@ __forceinline__ __device__ auto load_decay_tensor_q(const half_t* data_ptr, Thr_
     return r_decay;
 }
 
-template <typename Thr_MMA, typename config>
-__forceinline__ __device__ auto load_decay_tensor_k(const half_t* data_ptr, Thr_MMA thr_mma, const int head_id) {
-    using namespace cute;
-    constexpr int BLOCK = config::BLOCK;
-    constexpr int kHeadDim = config::kHeadDim;
-    Tensor g_decay = make_tensor(make_gmem_ptr<half_t>(data_ptr + head_id * BLOCK * kHeadDim), make_shape(Int<BLOCK>{}, Int<kHeadDim>{}), make_stride(Int<kHeadDim>{}, Int<1>{}));
-    Tensor r_decay = thr_mma.partition_fragment_B(g_decay);
-    copy(g_decay, r_decay);
-    return r_decay;
-}
+//template <typename Thr_MMA, typename config>
+//__forceinline__ __device__ auto load_decay_tensor_k(const half_t* data_ptr, Thr_MMA thr_mma, const int head_id) {
+//    using namespace cute;
+//    constexpr int BLOCK = config::BLOCK;
+//    constexpr int kHeadDim = config::kHeadDim;
+//    Tensor g_decay = make_tensor(make_gmem_ptr<half_t>(data_ptr + head_id * BLOCK * kHeadDim), make_shape(Int<BLOCK>{}, Int<kHeadDim>{}), make_stride(Int<kHeadDim>{}, Int<1>{}));
+//    Tensor r_decay = thr_mma.partition_fragment_B(g_decay);
+//    copy(g_decay, r_decay);
+//    return r_decay;
+//}
 
 template <typename Thr_MMA, typename config>
 __forceinline__ __device__ auto load_decay_tensor_kt(const half_t* data_ptr, Thr_MMA thr_mma, const int head_id) {
@@ -192,7 +192,7 @@ __global__ void flash_forward(const half_t* q, const half_t* k, const half_t* v,
 
     // load decay tensors
     Tensor q_decay_r = load_decay_tensor_q<decltype(thr_mma), config>(q_decay, thr_mma, head_id);
-    Tensor k_decay_r = load_decay_tensor_k<decltype(thr_mma), config>(k_decay, thr_mma, head_id);
+    Tensor kt_decay_r = load_decay_tensor_kt<decltype(thr_mma), config>(k_decay, thr_mma, head_id);
     Tensor diag_decay_r = load_decay_tensor_diag_block<decltype(thr_mma), config>(diag_decay, thr_mma, head_id);
     float block_decay_r = block_decay[head_id];
 
@@ -234,16 +234,19 @@ __global__ void flash_forward(const half_t* q, const half_t* k, const half_t* v,
 
         cute::gemm(mma, tArQ, tBrK, tCrS);
 
-        auto tCrS_fp16 = fp32_to_fp16(tCrS);
+        Tensor tCrS_fp16 = fp32_to_fp16(tCrS);
+        Tensor tCrS_fp16_decay = make_tensor_like(tCrS_fp16);
+        clear(tCrS_fp16_decay);
+        cute::transform(diag_decay_r, tCrS_fp16, tCrS_fp16_decay, multiply_op);
 
         // Step 2: compute O_intra
         // 将tCrS_f16转换为A layout，并且进行第二个gemm的计算
         // ((_2,_2),_4,_8) -> ((_2,_2),_4, (2, 4)) ->  -> ((2, 2, 2), 4, 4)
-        auto l = logical_divide(tCrS_fp16.layout(), Shape<X, X, Int<2>>{});
+        auto l = logical_divide(tCrS_fp16_decay.layout(), Shape<X, X, Int<2>>{});
         auto tOrS_laytout = make_layout(make_layout(get<0, 0>(l), get<0, 1>(l), get<2, 0>(l)), get<1>(l), get<2, 1>(l));
-        Tensor tOrS = make_tensor(tCrS_fp16.data(), tOrS_laytout);
+        Tensor tOrS = make_tensor(tCrS_fp16_decay.data(), tOrS_laytout);
 
-          Tensor tOgVt = thr_mma.partition_B(gVt);
+        Tensor tOgVt = thr_mma.partition_B(gVt);
         Tensor tOrVt = thr_mma.partition_fragment_B(gVt);
         cute::copy(tOgVt, tOrVt);
 
@@ -269,7 +272,11 @@ __global__ void flash_forward(const half_t* q, const half_t* k, const half_t* v,
 
         cute::copy(tBsKVt, tBrKVt);
 
-        cute::gemm(mma, tArQ, tBrKVt, tCrO_inter);
+        Tensor tArQ_decay = make_tensor_like(tArQ);
+        clear(tArQ_decay);
+        cute::transform(q_decay_r, tArQ, tArQ_decay, multiply_op)
+
+        cute::gemm(mma, tArQ_decay, tBrKVt, tCrO_inter);
 
         Tensor tCrO_inter_f16 = fp32_to_fp16(tCrO_inter);
 
@@ -299,14 +306,17 @@ __global__ void flash_forward(const half_t* q, const half_t* k, const half_t* v,
         cute::copy(tAgKt, tArKt);
         cute::copy(tBgVt, tBrVt);
 
+        Tensor tArKt_decay = make_tensor_like(tArKt);
+        cute::transform(kt_decay_r, tArKt, tArKt_decay, multiply_op)
+
         Tensor tCrNewKV = thr_mma.partition_fragment_C(sKV);
         Tensor tCsKV = thr_mma.partition_C(sKV);
         clear(tCrNewKV);
-        cute::gemm(mma, tArKt, tBrVt, tCrNewKV);
+        cute::gemm(mma, tArKt_decay, tBrVt, tCrNewKV);
 
         Tensor tCrNewKV_f16 =  fp32_to_fp16(tCrNewKV);
 
-        cute::axpby(1.0f, tCrNewKV_f16, 1.0f, tCsKV);
+        cute::axpby(1.0f, tCrNewKV_f16, block_decay_r, tCsKV);
 
 
         Tensor gKV = make_tensor(make_gmem_ptr<float>(kv_out + block_id * kHeadDim * kHeadDim),
