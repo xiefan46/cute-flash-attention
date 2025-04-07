@@ -173,7 +173,7 @@ def test_forward_with_decay(q, k, v, myflash):
     assert q_decay_cute.shape == (H, BLOCK, d)
     assert k_decay_cute.shape == (H, BLOCK, d)
     assert diag_decay_cute.shape == (H, BLOCK, BLOCK)
-    assert block_decay_cute.shape == (H)
+    assert block_decay_cute.shape == (H,)
 
     cute_output = myflash.forward_with_decay(q, k, v, q_decay_cute, k_decay_cute, diag_decay_cute, block_decay_cute)
 
