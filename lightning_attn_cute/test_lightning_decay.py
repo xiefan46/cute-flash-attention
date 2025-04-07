@@ -90,9 +90,9 @@ def print_decay_tensors(q, BLOCK = 128):
 
     print(f"k_decay: {k_decay}")
 
-    print(f"q_decay expend: {q_decay.expand(-1, -1, d)}")
+    print(f"q_decay expend: {q_decay.expand(-1, -1, d).shape}")
 
-    print(f"q_decay expend: {q_decay.expand(-1, -1, d)}")
+    print(f"q_decay expend: {q_decay.expand(-1, -1, d).shape}")
 
     print(f"diag_decay squeeze: {diag_decay.squeeze(dim=0).shape}")
 
