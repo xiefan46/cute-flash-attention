@@ -242,6 +242,10 @@ __global__ void flash_forward(const half_t* q, const half_t* k, const half_t* v,
         clear(tCrS_fp16_decay);
         cute::transform(diag_decay_r, tCrS_fp16, tCrS_fp16_decay, multiply_op);
 
+        if (thread0()) {
+          PRINT_TENSOR("tCrS_fp16_decay", tCrS_fp16_decay)
+        }
+
         // Step 2: compute O_intra
         // 将tCrS_f16转换为A layout，并且进行第二个gemm的计算
         // ((_2,_2),_4,_8) -> ((_2,_2),_4, (2, 4)) ->  -> ((2, 2, 2), 4, 4)
