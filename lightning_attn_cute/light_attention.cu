@@ -307,7 +307,7 @@ __global__ void flash_forward(const half_t* q, const half_t* k, const half_t* v,
         cute::copy(tBgVt, tBrVt);
 
         Tensor tArKt_decay = make_tensor_like(tArKt);
-        cute::transform(kt_decay_r, tArKt, tArKt_decay, multiply_op)
+        cute::transform(kt_decay_r, tArKt, tArKt_decay, multiply_op);
 
         Tensor tCrNewKV = thr_mma.partition_fragment_C(sKV);
         Tensor tCsKV = thr_mma.partition_C(sKV);
