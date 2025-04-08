@@ -372,6 +372,12 @@ __global__ void flash_forward(const half_t* q, const half_t* k, const half_t* v,
 
         cute::gemm(mma, tArKt_decay, tBrVt, tCrNewKV);
 
+        if (thread0()) {
+          PRINT_TENSOR("tArKt_decay", tArKt_decay);
+          PRINT_TENSOR("tBrVt", tBrVt);
+          PRINT_TENSOR("tCrNewKV", tCrNewKV);
+        }
+
         Tensor tCrNewKV_f16 =  fp32_to_fp16(tCrNewKV);
 
         cute::axpby(1.0f, tCrNewKV_f16, block_decay_r, tCsKV);
