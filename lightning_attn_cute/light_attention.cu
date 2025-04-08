@@ -360,10 +360,10 @@ __global__ void flash_forward(const half_t* q, const half_t* k, const half_t* v,
         assert(kt_decay_r.layout() == tArKt.layout());
         assert(kt_decay_r.layout() == tArKt_decay.layout());
         cute::transform(kt_decay_r, tArKt, tArKt_decay, multiply_op);
-        if (thread0()) {
-            PRINT_TENSOR("tArKt", tArKt);
-            PRINT_TENSOR("tArKt_decay tensor after", tArKt_decay);
-        }
+//        if (thread0()) {
+//            PRINT_TENSOR("tArKt", tArKt);
+//            PRINT_TENSOR("tArKt_decay tensor after", tArKt_decay);
+//        }
 
         Tensor tCrNewKV = thr_mma.partition_fragment_C(sKV);
         Tensor tCrNewKV_without_decay = thr_mma.partition_fragment_C(sKV);
@@ -371,28 +371,28 @@ __global__ void flash_forward(const half_t* q, const half_t* k, const half_t* v,
         clear(tCrNewKV);
         clear(tCrNewKV_without_decay);
 
-        if (thread0()) {
-          PRINT_TENSOR("tCrNewKV tensor before", tCrNewKV);
-        }
+//        if (thread0()) {
+//          PRINT_TENSOR("tCrNewKV tensor before", tCrNewKV);
+//        }
 
         cute::gemm(mma, tArKt_decay, tBrVt, tCrNewKV);
         cute::gemm(mma, tArKt, tBrVt, tCrNewKV_without_decay);
 
-        if (thread0()) {
-          PRINT_TENSOR("tArKt_decay", tArKt_decay);
-          PRINT_TENSOR("tBrVt", tBrVt);
-          PRINT_TENSOR("tCrNewKV", tCrNewKV);
-          PRINT_TENSOR("tCrNewKV_without_decay", tCrNewKV_without_decay);
-        }
+//        if (thread0()) {
+//          PRINT_TENSOR("tArKt_decay", tArKt_decay);
+//          PRINT_TENSOR("tBrVt", tBrVt);
+//          PRINT_TENSOR("tCrNewKV", tCrNewKV);
+//          PRINT_TENSOR("tCrNewKV_without_decay", tCrNewKV_without_decay);
+//        }
 
         Tensor tCrNewKV_f16 =  fp32_to_fp16(tCrNewKV);
 
         cute::axpby(1.0f, tCrNewKV_f16, block_decay_r, tCsKV);
 
-        if (thread0()) {
-          PRINT_TENSOR("tCrNewKV_f16", tCrNewKV_f16);
-          PRINT_TENSOR("tCsKV", tCsKV);
-        }
+//        if (thread0()) {
+//          PRINT_TENSOR("tCrNewKV_f16", tCrNewKV_f16);
+//          PRINT_TENSOR("tCsKV", tCsKV);
+//        }
 
 
         Tensor gKV = make_tensor(make_gmem_ptr<float>(kv_out + block_id * kHeadDim * kHeadDim),
