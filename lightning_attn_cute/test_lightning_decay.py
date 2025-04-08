@@ -249,7 +249,7 @@ def test_forward_with_decay(q, k, v, myflash):
             msg=f"block: {i}, Lightning attention implementations produce different results",
         )
 
-    print("✅ Two implementations match")
+    print("✅ Two implementations match all tensor")
 
 
 if __name__ == "__main__":
