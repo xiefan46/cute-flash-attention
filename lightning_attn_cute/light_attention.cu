@@ -29,7 +29,7 @@ namespace config {
 using namespace cute;
 
 // BLOCK 用于外层for循环, q, k, v三个矩阵每次切出来 BLOCK x d大小的矩阵加载到smem
-template <typename T_, int kHeadDim_ = 64, int BLOCK_ = 16>
+template <typename T_, int kHeadDim_ = 64, int BLOCK_ = 64>
 struct FlashConfig {
   using T = T_;
   static constexpr int kHeadDim = kHeadDim_;
@@ -203,8 +203,10 @@ __global__ void flash_forward(const half_t* q, const half_t* k, const half_t* v,
     float block_decay_r = block_decay[head_id];
 
     if (thread0()) {
+      	PRINT_TENSOR("q_decay_r", q_decay_r);
       	PRINT_TENSOR("k_decay_r", k_decay_r);
         PRINT_TENSOR("kt_decay_r", kt_decay_r);
+        PRINT_TENSOR("diag_decay_r", diag_decay_r);
     }
 
     auto multiply_op = [] (auto a, auto b) {
