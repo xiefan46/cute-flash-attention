@@ -263,26 +263,29 @@ __global__ void flash_forward(const half_t* q, const half_t* k, const half_t* v,
         // Step 2: compute O_intra
         // 将tCrS_f16转换为A layout，并且进行第二个gemm的计算
         // ((_2,_2),_4,_8) -> ((_2,_2),_4, (2, 4)) ->  -> ((2, 2, 2), 4, 4)
-//        auto l = logical_divide(tCrS_fp16_decay.layout(), Shape<X, X, Int<2>>{});
-//        auto tOrS_laytout = make_layout(make_layout(get<0, 0>(l), get<0, 1>(l), get<2, 0>(l)), get<1>(l), get<2, 1>(l));
-//        Tensor tOrS = make_tensor(tCrS_fp16_decay.data(), tOrS_laytout);
-//
-//        Tensor tOgVt = thr_mma.partition_B(gVt);
-//        Tensor tOrVt = thr_mma.partition_fragment_B(gVt);
-//        cute::copy(tOgVt, tOrVt);
-//
-//        Tensor tOrO_intra = partition_fragment_C(mma, make_shape(Int<BLOCK>{}, Int<kHeadDim>{})); //BLOCK x d
-//        cute::clear(tOrO_intra);
-//
-//        cute::gemm(mma, tOrS, tOrVt, tOrO_intra);
-//        Tensor tOrO_intra_f16 = fp32_to_fp16(tOrO_intra);
-//
-//
-//        // output debug info
-//        Tensor O_intra = make_tensor(make_gmem_ptr<half_t>(o_intra_out + block_id * BLOCK * kHeadDim),
-//                                 make_shape(Int<BLOCK>{}, Int<kHeadDim>{}), make_stride(Int<kHeadDim>{}, Int<1>{})); // d x d
-//        Tensor gO_intra = thr_mma.partition_C(O_intra);
-//        cute::copy(tOrO_intra_f16, gO_intra);
+        auto l = logical_divide(tCrS_fp16_decay.layout(), Shape<X, X, Int<2>>{});
+        auto tOrS_laytout = make_layout(make_layout(get<0, 0>(l), get<0, 1>(l), get<2, 0>(l)), get<1>(l), get<2, 1>(l));
+        Tensor tOrS = make_tensor(tCrS_fp16_decay.data(), tOrS_laytout);
+
+        Tensor tOgVt = thr_mma.partition_B(gVt);
+        Tensor tOrVt = thr_mma.partition_fragment_B(gVt);
+        cute::copy(tOgVt, tOrVt);
+
+        Tensor tOrO_intra = partition_fragment_C(mma, make_shape(Int<BLOCK>{}, Int<kHeadDim>{})); //BLOCK x d
+        cute::clear(tOrO_intra);
+
+        cute::gemm(mma, tOrS, tOrVt, tOrO_intra);
+        Tensor tOrO_intra_f16 = fp32_to_fp16(tOrO_intra);
+
+        if (thread0()) {
+          PRINT_TENSOR("tOrO_intra_f16", tOrO_intra_f16);
+        }
+
+        // output debug info
+        Tensor O_intra = make_tensor(make_gmem_ptr<half_t>(o_intra_out + block_id * BLOCK * kHeadDim),
+                                 make_shape(Int<BLOCK>{}, Int<kHeadDim>{}), make_stride(Int<kHeadDim>{}, Int<1>{})); // d x d
+        Tensor gO_intra = thr_mma.partition_C(O_intra);
+        cute::copy(tOrO_intra_f16, gO_intra);
 //
 //        // Step3: compute o_inter
 //        // 计算 o_inter = q @ kv -> BLOCK x d @ d x d = BLOCK x d
