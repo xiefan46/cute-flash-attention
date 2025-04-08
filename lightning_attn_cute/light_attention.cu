@@ -325,6 +325,10 @@ __global__ void flash_forward(const half_t* q, const half_t* k, const half_t* v,
         // write O to global memory
         Tensor tCgO = thr_mma.partition_C(gO);
         cute::copy(tCrO_inter_f16, tCgO);
+
+        if (thread0()) {
+          PRINT_TENSOR("O_intra + O_inter", tCrO_inter_f16);
+        }
 //
 //        // TODO: figure out __syncthreads()放在什么地方合适，特别注意那种需要多个view进行计算的，比如smem_kv
 //        __syncthreads();
