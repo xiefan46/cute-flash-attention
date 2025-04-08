@@ -150,7 +150,7 @@ def torch_lightning_attn(q, k, v, q_decay, k_decay, diag_decay, block_decay, BLO
 def test_forward_with_decay(q, k, v, myflash):
 
     B, H, N, d = q.shape
-    BLOCK = 64
+    BLOCK = 16
     num_block = (N + BLOCK - 1) // BLOCK
     array = torch.arange(BLOCK).to(q) + 1
     slope_rate = _build_slope_tensor(H).to(q.device)
@@ -286,7 +286,7 @@ if __name__ == "__main__":
     set_seed(10086)
     B = 1
     H = 1
-    N = 64
+    N = 16
     # NOTE: we only support d = 64!
     d = 64
 
