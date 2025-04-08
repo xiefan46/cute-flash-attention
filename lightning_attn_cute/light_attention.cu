@@ -101,16 +101,16 @@ __forceinline__ __device__ auto load_decay_tensor_q(const half_t* data_ptr, Thr_
     return r_decay;
 }
 
-//template <typename Thr_MMA, typename config>
-//__forceinline__ __device__ auto load_decay_tensor_k(const half_t* data_ptr, Thr_MMA thr_mma, const int head_id) {
-//    using namespace cute;
-//    constexpr int BLOCK = config::BLOCK;
-//    constexpr int kHeadDim = config::kHeadDim;
-//    Tensor g_decay = make_tensor(make_gmem_ptr<half_t>(data_ptr + head_id * BLOCK * kHeadDim), make_shape(Int<BLOCK>{}, Int<kHeadDim>{}), make_stride(Int<kHeadDim>{}, Int<1>{}));
-//    Tensor r_decay = thr_mma.partition_fragment_B(g_decay);
-//    copy(g_decay, r_decay);
-//    return r_decay;
-//}
+template <typename Thr_MMA, typename config>
+__forceinline__ __device__ auto load_decay_tensor_k(const half_t* data_ptr, Thr_MMA thr_mma, const int head_id) {
+    using namespace cute;
+    constexpr int BLOCK = config::BLOCK;
+    constexpr int kHeadDim = config::kHeadDim;
+    Tensor g_decay = make_tensor(make_gmem_ptr<half_t>(data_ptr + head_id * BLOCK * kHeadDim), make_shape(Int<BLOCK>{}, Int<kHeadDim>{}), make_stride(Int<kHeadDim>{}, Int<1>{}));
+    Tensor r_decay = thr_mma.partition_fragment_B(g_decay);
+    copy(g_decay, r_decay);
+    return r_decay;
+}
 
 template <typename Thr_MMA, typename config>
 __forceinline__ __device__ auto load_decay_tensor_kt(const half_t* data_ptr, Thr_MMA thr_mma, const int head_id) {
@@ -192,11 +192,13 @@ __global__ void flash_forward(const half_t* q, const half_t* k, const half_t* v,
 
     // load decay tensors
     Tensor q_decay_r = load_decay_tensor_q<decltype(thr_mma), config>(q_decay, thr_mma, head_id);
+    Tensor k_decay_r = load_decay_tensor_k<decltype(thr_mma), config>(k_decay, thr_mma, head_id);
     Tensor kt_decay_r = load_decay_tensor_kt<decltype(thr_mma), config>(k_decay, thr_mma, head_id);
     Tensor diag_decay_r = load_decay_tensor_diag_block<decltype(thr_mma), config>(diag_decay, thr_mma, head_id);
     float block_decay_r = block_decay[head_id];
 
     if (thread0()) {
+      	PRINT_TENSOR("k_decay_r", k_decay_r);
         PRINT_TENSOR("kt_decay_r", kt_decay_r);
     }
 
