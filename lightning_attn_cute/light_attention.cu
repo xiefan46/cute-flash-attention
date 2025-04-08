@@ -186,6 +186,7 @@ __global__ void flash_forward(const half_t* q, const half_t* k, const half_t* v,
     clear(tBsKVt);
 
     if (thread0()) {
+      	PRINT("head id", head_id);
         PRINT("mma size", size(mma));
         PRINT("num_block", num_block);
     }
