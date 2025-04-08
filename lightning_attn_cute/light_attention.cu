@@ -354,6 +354,7 @@ __global__ void flash_forward(const half_t* q, const half_t* k, const half_t* v,
         clear(tArKt_decay);
         if (thread0()) {
             PRINT_TENSOR("tArKt_decay tensor before", tArKt_decay);
+            PRINT_TENSOR("kt_decay_r", kt_decay_r);
         }
         cute::transform(kt_decay_r, tArKt, tArKt_decay, multiply_op);
         if (thread0()) {
