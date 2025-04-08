@@ -361,29 +361,29 @@ __global__ void flash_forward(const half_t* q, const half_t* k, const half_t* v,
         if (thread0()) {
             PRINT_TENSOR("tArKt_decay tensor after", tArKt_decay);
         }
-//
-//        Tensor tCrNewKV = thr_mma.partition_fragment_C(sKV);
-//        Tensor tCsKV = thr_mma.partition_C(sKV);
-//        clear(tCrNewKV);
-//
-////        if (thread0()) {
-////          PRINT_TENSOR("tArKt_decay tensor", tArKt_decay);
-////        }
-//
-//        cute::gemm(mma, tArKt_decay, tBrVt, tCrNewKV);
-//
-//        Tensor tCrNewKV_f16 =  fp32_to_fp16(tCrNewKV);
-//
-//        cute::axpby(1.0f, tCrNewKV_f16, block_decay_r, tCsKV);
-//
-//
-//        Tensor gKV = make_tensor(make_gmem_ptr<float>(kv_out + block_id * kHeadDim * kHeadDim),
-//                                 make_shape(Int<kHeadDim>{}, Int<kHeadDim>{}), make_stride(Int<kHeadDim>{}, Int<1>{})); // d x d
-//
-//        Tensor tCgKV = thr_mma.partition_C(gKV);
-//        // copy kv result to global
-//        cute::copy(tCsKV, tCgKV);
-//        __syncthreads();
+
+        Tensor tCrNewKV = thr_mma.partition_fragment_C(sKV);
+        Tensor tCsKV = thr_mma.partition_C(sKV);
+        clear(tCrNewKV);
+
+//        if (thread0()) {
+//          PRINT_TENSOR("tArKt_decay tensor", tArKt_decay);
+//        }
+
+        cute::gemm(mma, tArKt_decay, tBrVt, tCrNewKV);
+
+        Tensor tCrNewKV_f16 =  fp32_to_fp16(tCrNewKV);
+
+        cute::axpby(1.0f, tCrNewKV_f16, block_decay_r, tCsKV);
+
+
+        Tensor gKV = make_tensor(make_gmem_ptr<float>(kv_out + block_id * kHeadDim * kHeadDim),
+                                 make_shape(Int<kHeadDim>{}, Int<kHeadDim>{}), make_stride(Int<kHeadDim>{}, Int<1>{})); // d x d
+
+        Tensor tCgKV = thr_mma.partition_C(gKV);
+        // copy kv result to global
+        cute::copy(tCsKV, tCgKV);
+        __syncthreads();
     // } // end of for loop
 
 }
