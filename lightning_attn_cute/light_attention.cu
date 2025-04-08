@@ -359,6 +359,7 @@ __global__ void flash_forward(const half_t* q, const half_t* k, const half_t* v,
         assert(kt_decay_r.layout() == tArKt_decay.layout());
         cute::transform(kt_decay_r, tArKt, tArKt_decay, multiply_op);
         if (thread0()) {
+            PRINT_TENSOR("tArKt", tArKt);
             PRINT_TENSOR("tArKt_decay tensor after", tArKt_decay);
         }
 
@@ -366,9 +367,9 @@ __global__ void flash_forward(const half_t* q, const half_t* k, const half_t* v,
         Tensor tCsKV = thr_mma.partition_C(sKV);
         clear(tCrNewKV);
 
-//        if (thread0()) {
-//          PRINT_TENSOR("tArKt_decay tensor", tArKt_decay);
-//        }
+        if (thread0()) {
+          PRINT_TENSOR("tCrNewKV tensor before", tCrNewKV);
+        }
 
         cute::gemm(mma, tArKt_decay, tBrVt, tCrNewKV);
 
