@@ -170,9 +170,9 @@ def test_forward_with_decay(q, k, v, myflash):
 
     torch_output, torch_kv_output, torch_o_inter_out, torch_o_intra_out = torch_lightning_attn(q, k, v, q_decay, k_decay, diag_decay, block_decay, BLOCK)
 
-    q_decay_cute = q_decay.expand(-1, -1, d).to(torch.float16)
-    k_decay_cute = k_decay.expand(-1, -1, d).to(torch.float16)
-    diag_decay_cute = diag_decay.squeeze(dim=0).to(torch.float16)
+    q_decay_cute = q_decay.expand(-1, -1, d).to(torch.float16).contiguous()
+    k_decay_cute = k_decay.expand(-1, -1, d).to(torch.float16).contiguous()
+    diag_decay_cute = diag_decay.squeeze(dim=0).to(torch.float16).contiguous()
 
     block_decay_cute = block_decay.squeeze().to(torch.float32)
     if block_decay_cute.dim() == 0:
