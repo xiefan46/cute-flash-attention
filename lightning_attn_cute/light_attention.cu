@@ -289,34 +289,42 @@ __global__ void flash_forward(const half_t* q, const half_t* k, const half_t* v,
 //
 //        // Step3: compute o_inter
 //        // 计算 o_inter = q @ kv -> BLOCK x d @ d x d = BLOCK x d
-//        Tensor tCrO_inter = partition_fragment_C(mma, make_shape(Int<BLOCK>{}, Int<kHeadDim>{}));
-//        cute::clear(tCrO_inter);
-//
-//        Tensor tBrKVt = thr_mma.partition_fragment_B(sKVt);
-//
-//        cute::copy(tBsKVt, tBrKVt);
-//
-//        Tensor tArQ_decay = make_tensor_like(tArQ);
-//        clear(tArQ_decay);
-//        cute::transform(q_decay_r, tArQ, tArQ_decay, multiply_op);
-//
-//        cute::gemm(mma, tArQ_decay, tBrKVt, tCrO_inter);
-//
-//        Tensor tCrO_inter_f16 = fp32_to_fp16(tCrO_inter);
-//
-//        // output debug info
-//        Tensor O_inter = make_tensor(make_gmem_ptr<half_t>(o_inter_out + block_id * BLOCK * kHeadDim),
-//                                 make_shape(Int<BLOCK>{}, Int<kHeadDim>{}), make_stride(Int<kHeadDim>{}, Int<1>{})); // d x d
-//        Tensor gO_inter = thr_mma.partition_C(O_inter);
-//        cute::copy(tCrO_inter_f16, gO_inter);
-//
-//
-//        // Step 4: compute O = O_intra + O_inter
-//        half_t half_one = half_t(1.0f);
-//        cute::axpby(half_one, tOrO_intra_f16, half_one, tCrO_inter_f16);
-//        // write O to global memory
-//        Tensor tCgO = thr_mma.partition_C(gO);
-//        cute::copy(tCrO_inter_f16, tCgO);
+        Tensor tCrO_inter = partition_fragment_C(mma, make_shape(Int<BLOCK>{}, Int<kHeadDim>{}));
+        cute::clear(tCrO_inter);
+
+        Tensor tBrKVt = thr_mma.partition_fragment_B(sKVt);
+
+        cute::copy(tBsKVt, tBrKVt);
+
+        Tensor tArQ_decay = make_tensor_like(tArQ);
+        clear(tArQ_decay);
+        cute::transform(q_decay_r, tArQ, tArQ_decay, multiply_op);
+
+        if (thread0()) {
+          PRINT_TENSOR("tArQ_decay", tArQ_decay);
+        }
+
+        cute::gemm(mma, tArQ_decay, tBrKVt, tCrO_inter);
+
+        Tensor tCrO_inter_f16 = fp32_to_fp16(tCrO_inter);
+
+        if (thread0()) {
+          PRINT_TENSOR("tCrO_inter_f16", tCrO_inter_f16);
+        }
+
+        // output debug info
+        Tensor O_inter = make_tensor(make_gmem_ptr<half_t>(o_inter_out + block_id * BLOCK * kHeadDim),
+                                 make_shape(Int<BLOCK>{}, Int<kHeadDim>{}), make_stride(Int<kHeadDim>{}, Int<1>{})); // d x d
+        Tensor gO_inter = thr_mma.partition_C(O_inter);
+        cute::copy(tCrO_inter_f16, gO_inter);
+
+
+        // Step 4: compute O = O_intra + O_inter
+        half_t half_one = half_t(1.0f);
+        cute::axpby(half_one, tOrO_intra_f16, half_one, tCrO_inter_f16);
+        // write O to global memory
+        Tensor tCgO = thr_mma.partition_C(gO);
+        cute::copy(tCrO_inter_f16, tCgO);
 //
 //        // TODO: figure out __syncthreads()放在什么地方合适，特别注意那种需要多个view进行计算的，比如smem_kv
 //        __syncthreads();
