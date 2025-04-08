@@ -96,9 +96,9 @@ __forceinline__ __device__ auto load_decay_tensor_q(const half_t* data_ptr, Thr_
     constexpr int BLOCK = config::BLOCK;
     constexpr int kHeadDim = config::kHeadDim;
     Tensor g_decay = make_tensor(make_gmem_ptr<half_t>(data_ptr + head_id * BLOCK * kHeadDim), make_shape(Int<BLOCK>{}, Int<kHeadDim>{}), make_stride(Int<kHeadDim>{}, Int<1>{}));
-    Tensor g_decay_partition = thr_mma.partition_A(g_decay);
-    Tensor r_decay = thr_mma.partition_fragment_A(g_decay);
-    copy(g_decay_partition, r_decay);
+    Tensor tAgDecay = thr_mma.partition_A(g_decay);
+    Tensor tArDecay = thr_mma.partition_fragment_A(g_decay);
+    copy(tAgDecay, tArDecay);
     return r_decay;
 }
 
