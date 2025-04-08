@@ -331,31 +331,34 @@ __global__ void flash_forward(const half_t* q, const half_t* k, const half_t* v,
         }
 //
 //        // TODO: figure out __syncthreads()放在什么地方合适，特别注意那种需要多个view进行计算的，比如smem_kv
-//        __syncthreads();
-//        // Step5: Update KV
-//        // new_kv = tl.dot(k_t, v) d x BLOCK @ d x BLOCK = d x  d
-//        // kv = kv * block_decay + new_kv, block_decay = 1.0
-//        Tensor tAgKt = thr_mma.partition_A(gKt);
-//        Tensor tArKt = thr_mma.partition_fragment_A(gKt);
-//        Tensor tBgVt = thr_mma.partition_B(gVt);
-//        Tensor tBrVt = thr_mma.partition_fragment_B(gVt);
-//
-//        cute::copy(tAgKt, tArKt);
-//        cute::copy(tBgVt, tBrVt);
-//
-//        if (thread0()) {
-//            // PRINT_TENSOR("tArKt tensor", tArKt);
-//            PRINT("tArKt shape", tArKt);
-//            print_tensor(tArKt);
-//        }
-//
-//        Tensor tArKt_decay = make_tensor_like(tArKt);
-//
-//        clear(tArKt_decay);
-////        if (thread0()) {
-////            PRINT_TENSOR("tArKt_decay tensor before", tArKt_decay);
-////        }
-//        cute::transform(kt_decay_r, tArKt, tArKt_decay, multiply_op);
+        __syncthreads();
+        // Step5: Update KV
+        // new_kv = tl.dot(k_t, v) d x BLOCK @ d x BLOCK = d x  d
+        // kv = kv * block_decay + new_kv, block_decay = 1.0
+        Tensor tAgKt = thr_mma.partition_A(gKt);
+        Tensor tArKt = thr_mma.partition_fragment_A(gKt);
+        Tensor tBgVt = thr_mma.partition_B(gVt);
+        Tensor tBrVt = thr_mma.partition_fragment_B(gVt);
+
+        cute::copy(tAgKt, tArKt);
+        cute::copy(tBgVt, tBrVt);
+
+        if (thread0()) {
+            // PRINT_TENSOR("tArKt tensor", tArKt);
+            PRINT_TENSOR("tArKt", tArKt);
+            PRINT_TENSOR("tBrVt", tBrVt);
+        }
+
+        Tensor tArKt_decay = make_tensor_like(tArKt);
+
+        clear(tArKt_decay);
+        if (thread0()) {
+            PRINT_TENSOR("tArKt_decay tensor before", tArKt_decay);
+        }
+        cute::transform(kt_decay_r, tArKt, tArKt_decay, multiply_op);
+        if (thread0()) {
+            PRINT_TENSOR("tArKt_decay tensor after", tArKt_decay);
+        }
 //
 //        Tensor tCrNewKV = thr_mma.partition_fragment_C(sKV);
 //        Tensor tCsKV = thr_mma.partition_C(sKV);
