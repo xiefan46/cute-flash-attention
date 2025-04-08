@@ -376,6 +376,11 @@ __global__ void flash_forward(const half_t* q, const half_t* k, const half_t* v,
 
         cute::axpby(1.0f, tCrNewKV_f16, block_decay_r, tCsKV);
 
+        if (thread0()) {
+          PRINT_TENSOR("tCrNewKV_f16", tCrNewKV_f16);
+          PRINT_TENSOR("tCsKV", tCsKV);
+        }
+
 
         Tensor gKV = make_tensor(make_gmem_ptr<float>(kv_out + block_id * kHeadDim * kHeadDim),
                                  make_shape(Int<kHeadDim>{}, Int<kHeadDim>{}), make_stride(Int<kHeadDim>{}, Int<1>{})); // d x d
