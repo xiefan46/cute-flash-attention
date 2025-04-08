@@ -99,7 +99,7 @@ __forceinline__ __device__ auto load_decay_tensor_q(const half_t* data_ptr, Thr_
     Tensor tAgDecay = thr_mma.partition_A(g_decay);
     Tensor tArDecay = thr_mma.partition_fragment_A(g_decay);
     copy(tAgDecay, tArDecay);
-    return r_decay;
+    return tArDecay;
 }
 
 template <typename Thr_MMA, typename config>
