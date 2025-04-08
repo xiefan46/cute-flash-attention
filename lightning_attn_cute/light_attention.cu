@@ -107,8 +107,10 @@ __forceinline__ __device__ auto load_decay_tensor_k(const half_t* data_ptr, Thr_
     constexpr int BLOCK = config::BLOCK;
     constexpr int kHeadDim = config::kHeadDim;
     Tensor g_decay = make_tensor(make_gmem_ptr<half_t>(data_ptr + head_id * BLOCK * kHeadDim), make_shape(Int<BLOCK>{}, Int<kHeadDim>{}), make_stride(Int<kHeadDim>{}, Int<1>{}));
+    Tensor g_decay_partition = thr_mma.partition_B(g_decay);
     Tensor r_decay = thr_mma.partition_fragment_B(g_decay);
-    copy(g_decay, r_decay);
+    assert(g_decay_partition.layout() == r_decay.layout());
+    copy(g_decay_partition, r_decay);
     return r_decay;
 }
 
@@ -118,8 +120,10 @@ __forceinline__ __device__ auto load_decay_tensor_kt(const half_t* data_ptr, Thr
     constexpr int BLOCK = config::BLOCK;
     constexpr int kHeadDim = config::kHeadDim;
     Tensor g_decay = make_tensor(make_gmem_ptr<half_t>(data_ptr + head_id * BLOCK * kHeadDim), make_shape(Int<BLOCK>{}, Int<kHeadDim>{}), make_stride(Int<1>{}, Int<BLOCK>{}));
+    Tensor g_decay_partition = thr_mma.partition_A(g_decay);
     Tensor r_decay = thr_mma.partition_fragment_A(g_decay);
-    copy(g_decay, r_decay);
+    assert(g_decay_partition.layout() == r_decay.layout());
+    copy(g_decay_partition, r_decay);
     return r_decay;
 }
 
