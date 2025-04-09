@@ -190,8 +190,6 @@ def test_forward_with_decay(q, k, v, myflash):
     cute_output = myflash.forward_with_decay(q, k, v, q_decay_cute, k_decay_cute, diag_decay_cute, block_decay_cute)
 
 
-    print(f"cute tensor: {cute_output[3, 11, 158, 32]}, torch tensor: {torch_output[3, 11, 158, 32]}")
-
     torch.testing.assert_close(
         torch_output,
         cute_output,
