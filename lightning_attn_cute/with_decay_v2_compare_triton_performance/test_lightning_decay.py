@@ -233,9 +233,9 @@ if __name__ == "__main__":
 
 
     set_seed(10086)
-    B = 16
-    H = 4
-    N = 256
+    B = 4
+    H = 16
+    N = 512
     # NOTE: we only support d = 64!
     d = 64
 
