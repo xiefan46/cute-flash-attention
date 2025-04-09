@@ -117,9 +117,6 @@ def torch_lightning_attn(q, k, v, q_decay, k_decay, diag_decay, block_decay, BLO
 
 
     kv = torch.zeros(B, H, d, d).to(torch.float32).to(q.device)
-    kv_output = torch.zeros(NUM_BLOCK, d, d).to(kv.dtype).to(q.device)
-    o_inter_output = torch.zeros(NUM_BLOCK, BLOCK, d).to(torch.float16).to(q.device)
-    o_intra_output = torch.zeros(NUM_BLOCK, BLOCK, d).to(torch.float16).to(q.device)
 
     output = torch.empty((B, H, N, d), dtype=q.dtype, device=q.device)
     for i in range(NUM_BLOCK):
@@ -131,20 +128,17 @@ def torch_lightning_attn(q, k, v, q_decay, k_decay, diag_decay, block_decay, BLO
         ki = k[:, :, si:ei].contiguous()
         vi = v[:, :, si:ei].contiguous()
         qkv_none_diag = torch.matmul(qi * q_decay[:, :m], kv.to(torch.float16))
-        o_inter_output[i] = qkv_none_diag.detach().clone()
         # diag
         qk = (
                 torch.matmul(qi, ki.transpose(-1, -2))
                 * diag_decay[:, :, :m, :m]
         )
         qkv_diag = torch.matmul(qk, vi)
-        o_intra_output[i] = qkv_diag.detach().clone()
 
         output[:, :, si:ei] = qkv_none_diag + qkv_diag
         kv = block_decay * kv + torch.matmul(
             (ki * k_decay[:, -m:]).transpose(-1, -2), vi)
-        kv_output[i] = kv.detach().clone()
-    return output, kv_output, o_inter_output, o_intra_output
+    return output
 
 
 def test_forward_with_decay(q, k, v, myflash):
@@ -168,7 +162,7 @@ def test_forward_with_decay(q, k, v, myflash):
     diag_decay = torch.exp(s_index).to(torch.float16)
     block_decay = torch.exp(-slope_rate * BLOCK).to(torch.float32)
 
-    torch_output, torch_kv_output, torch_o_inter_out, torch_o_intra_out = torch_lightning_attn(q, k, v, q_decay, k_decay, diag_decay, block_decay, BLOCK)
+    torch_output = torch_lightning_attn(q, k, v, q_decay, k_decay, diag_decay, block_decay, BLOCK)
 
     q_decay_cute = q_decay.expand(-1, -1, d).to(torch.float16).contiguous()
     k_decay_cute = k_decay.expand(-1, -1, d).to(torch.float16).contiguous()
@@ -193,45 +187,8 @@ def test_forward_with_decay(q, k, v, myflash):
     for t in (q_decay_cute, k_decay_cute, diag_decay_cute, block_decay_cute):
         print(f"min : {torch.min(t)}， max: {torch.max(t)}")
 
-    cute_output, cute_kv_output, cute_o_inter_out, cute_o_intra_out = myflash.forward_with_decay(q, k, v, q_decay_cute, k_decay_cute, diag_decay_cute, block_decay_cute)
+    cute_output = myflash.forward_with_decay(q, k, v, q_decay_cute, k_decay_cute, diag_decay_cute, block_decay_cute)
 
-    for i in range(num_block):
-        print(f"torch_kv_output shape: {torch_kv_output[i].shape}")
-        print(f"cute_kv_output shape: {cute_kv_output[i].shape}")
-        torch.testing.assert_close(
-            torch_kv_output[i],
-            cute_kv_output[i],
-            rtol=1e-3,
-            atol=1e-5,
-            msg=f"block : {i}, KV results are different.torch_kv_output: {torch_kv_output[i]}. cute_kv_output: {cute_kv_output[i]}",
-        )
-    print("✅ kv results match")
-
-    for i in range(num_block):
-        print(f"torch_o_intra_out shape: {torch_o_intra_out[i].shape}")
-        print(f"cute_o_intra_out shape: {cute_o_intra_out[i].shape}")
-        print(f"torch_o_intra_out dtype/device: {torch_o_intra_out[i].dtype} device: {torch_o_intra_out[i].device}")
-        print(f"cute_o_intra_out dtype/device: {cute_o_intra_out[i].dtype}, device: {cute_o_intra_out[i].device}")
-        torch.testing.assert_close(
-            torch_o_intra_out[i],
-            cute_o_intra_out[i],
-            # rtol=1e-3,
-            # atol=1e-2,
-            msg=f"block : {i}, o_intra results are different.torch_o_intra_out: {torch_o_intra_out[i]}, cute_o_intra_out: {cute_o_intra_out[i]}",
-        )
-    print("✅ o intra result maches")
-
-    for i in range(num_block):
-        print(f"torch_o_inter_out shape: {torch_o_inter_out[i].shape}")
-        print(f"cute_o_inter_out shape: {cute_o_inter_out[i].shape}")
-        torch.testing.assert_close(
-            torch_o_inter_out[i],
-            cute_o_inter_out[i],
-            # rtol=1e-3,
-            # atol=1e-2,
-            msg=f"block : {i},  o inter results are different. torch_o_inter_out: {torch_o_inter_out[i]}, cute_o_inter_out: {cute_o_inter_out[i]}",
-        )
-    print("✅ o inter result matches")
 
 
     for i in range(num_block):

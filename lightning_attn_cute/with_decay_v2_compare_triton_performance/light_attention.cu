@@ -140,8 +140,7 @@ __forceinline__ __device__ auto load_decay_tensor_diag_block(const half_t* data_
 // diag_decay half [H, BLOCK, BLOCK]
 // block_decay float [H]
 template <typename config>
-__global__ void flash_forward(const half_t* q, const half_t* k, const half_t* v, half_t* o, const int B, const int H, const int N, float* kv_out,
-                              half_t* o_inter_out, half_t* o_intra_out, half_t* q_decay, half_t* k_decay, half_t* diag_decay, float* block_decay) {
+__global__ void flash_forward(const half_t* q, const half_t* k, const half_t* v, half_t* o, const int B, const int H, const int N, half_t* q_decay, half_t* k_decay, half_t* diag_decay, float* block_decay) {
     using namespace cute;
     using TiledMMA = typename config::TiledMMA;
 
@@ -259,11 +258,6 @@ __global__ void flash_forward(const half_t* q, const half_t* k, const half_t* v,
 //          PRINT_TENSOR("tOrO_intra_f16", tOrO_intra_f16);
 //        }
 
-        // output debug info
-        Tensor O_intra = make_tensor(make_gmem_ptr<half_t>(o_intra_out + block_id * BLOCK * kHeadDim),
-                                 make_shape(Int<BLOCK>{}, Int<kHeadDim>{}), make_stride(Int<kHeadDim>{}, Int<1>{})); // d x d
-        Tensor gO_intra = thr_mma.partition_C(O_intra);
-        cute::copy(tOrO_intra_f16, gO_intra);
 //
 //        // Step3: compute o_inter
 //        // 计算 o_inter = q @ kv -> BLOCK x d @ d x d = BLOCK x d
@@ -289,13 +283,6 @@ __global__ void flash_forward(const half_t* q, const half_t* k, const half_t* v,
 //        if (thread0()) {
 //          PRINT_TENSOR("tCrO_inter_f16", tCrO_inter_f16);
 //        }
-
-        // output debug info
-        Tensor O_inter = make_tensor(make_gmem_ptr<half_t>(o_inter_out + block_id * BLOCK * kHeadDim),
-                                 make_shape(Int<BLOCK>{}, Int<kHeadDim>{}), make_stride(Int<kHeadDim>{}, Int<1>{})); // d x d
-        Tensor gO_inter = thr_mma.partition_C(O_inter);
-        cute::copy(tCrO_inter_f16, gO_inter);
-
 
         // Step 4: compute O = O_intra + O_inter
         half_t half_one = half_t(1.0f);
@@ -342,17 +329,14 @@ __global__ void flash_forward(const half_t* q, const half_t* k, const half_t* v,
 //        }
 
         Tensor tCrNewKV = thr_mma.partition_fragment_C(sKV);
-        Tensor tCrNewKV_without_decay = thr_mma.partition_fragment_C(sKV);
         Tensor tCsKV = thr_mma.partition_C(sKV);
         clear(tCrNewKV);
-        clear(tCrNewKV_without_decay);
 
 //        if (thread0()) {
 //          PRINT_TENSOR("tCrNewKV tensor before", tCrNewKV);
 //        }
 
         cute::gemm(mma, tArKt_decay, tBrVt, tCrNewKV);
-        cute::gemm(mma, tArKt, tBrVt, tCrNewKV_without_decay);
 
 //        if (thread0()) {
 //          PRINT_TENSOR("tArKt_decay", tArKt_decay);
@@ -366,19 +350,6 @@ __global__ void flash_forward(const half_t* q, const half_t* k, const half_t* v,
         cute::axpby(1.0f, tCrNewKV_f16, block_decay_r, tCsKV);
         __syncthreads();
 
-//        if (thread0()) {
-//          PRINT_TENSOR("tCrNewKV_f16", tCrNewKV_f16);
-//          PRINT_TENSOR("tCsKV", tCsKV);
-//        }
-
-
-        Tensor gKV = make_tensor(make_gmem_ptr<float>(kv_out + block_id * kHeadDim * kHeadDim),
-                                 make_shape(Int<kHeadDim>{}, Int<kHeadDim>{}), make_stride(Int<kHeadDim>{}, Int<1>{})); // d x d
-
-        Tensor tCgKV = thr_mma.partition_C(gKV);
-        // copy kv result to global
-        cute::copy(tCsKV, tCgKV);
-
      } // end of for loop
 
 }
@@ -387,7 +358,7 @@ __global__ void flash_forward(const half_t* q, const half_t* k, const half_t* v,
 
 
 // q [B, H, N, d] k  [B, H, N, d] v [B, H, N, d]
-std::tuple<torch::Tensor, torch::Tensor, torch::Tensor, torch::Tensor> forward_with_decay(torch::Tensor q, torch::Tensor k, torch::Tensor v,
+torch::Tensor forward_with_decay(torch::Tensor q, torch::Tensor k, torch::Tensor v,
                                                                             torch::Tensor q_decay, torch::Tensor k_decay, torch::Tensor diag_decay, torch::Tensor block_decay) {
   int B = q.size(0);
   int H = q.size(1);
@@ -397,12 +368,6 @@ std::tuple<torch::Tensor, torch::Tensor, torch::Tensor, torch::Tensor> forward_w
   int BLOCK = 64;
   int num_block = (N + BLOCK - 1) / BLOCK;
 
-  PRINT("num_block", num_block);
-
-  auto kv_out = torch::zeros({num_block, d, d}, torch::TensorOptions().dtype(torch::kFloat32).device(torch::Device(torch::kCUDA, 0)));
-
-  auto o_inter_out = torch::zeros({num_block, BLOCK, d}, torch::TensorOptions().dtype(torch::kFloat16).device(torch::Device(torch::kCUDA, 0)));
-  auto o_intra_out = torch::zeros({num_block, BLOCK, d}, torch::TensorOptions().dtype(torch::kFloat16).device(torch::Device(torch::kCUDA, 0)));
 
   auto out = torch::empty_like(q);
 
@@ -415,10 +380,9 @@ std::tuple<torch::Tensor, torch::Tensor, torch::Tensor, torch::Tensor> forward_w
   PRINT("block", block);
 
   kernel<<<grid, block>>>((cute::half_t*)q.data_ptr(), (cute::half_t*)k.data_ptr(),
-                                              (cute::half_t*)v.data_ptr(), (cute::half_t*)out.data_ptr(), B, H, N, (float*)kv_out.data_ptr(),
-                                    (cute::half_t*)o_inter_out.data_ptr(), (cute::half_t*)o_intra_out.data_ptr(),
+                                              (cute::half_t*)v.data_ptr(), (cute::half_t*)out.data_ptr(), B, H, N,
                                     (cute::half_t*) q_decay.data_ptr(),  (cute::half_t*) k_decay.data_ptr(),  (cute::half_t*) diag_decay.data_ptr(), (float*) block_decay.data_ptr());
 
   cudaDeviceSynchronize();
-  return std::make_tuple(out, kv_out, o_inter_out, o_intra_out);
+  return return out;
 }
