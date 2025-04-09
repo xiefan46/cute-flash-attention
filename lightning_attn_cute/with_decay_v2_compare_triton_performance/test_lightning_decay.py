@@ -145,7 +145,6 @@ def test_forward_with_decay(q, k, v, myflash):
 
     B, H, N, d = q.shape
     BLOCK = 64
-    num_block = (N + BLOCK - 1) // BLOCK
     array = torch.arange(BLOCK).to(q) + 1
     slope_rate = _build_slope_tensor(H).to(q.device)
     q_decay = torch.exp(-slope_rate * array.reshape(-1, 1)).to(torch.float16)

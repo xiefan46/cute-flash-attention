@@ -29,7 +29,7 @@ namespace config {
 using namespace cute;
 
 // BLOCK 用于外层for循环, q, k, v三个矩阵每次切出来 BLOCK x d大小的矩阵加载到smem
-template <typename T_, int kHeadDim_ = 96, int BLOCK_ = 16>
+template <typename T_, int kHeadDim_ = 96, int BLOCK_ = 64>
 struct FlashConfig {
   using T = T_;
   static constexpr int kHeadDim = kHeadDim_;
@@ -365,13 +365,8 @@ torch::Tensor forward_with_decay(torch::Tensor q, torch::Tensor k, torch::Tensor
   int N = q.size(2);
   int d = q.size(3);
 
-  int BLOCK = 64;
-  int num_block = (N + BLOCK - 1) / BLOCK;
-
-
   auto out = torch::empty_like(q);
 
-  // only for head_dim=64
   config::FlashConfig<cute::half_t> config;
   dim3 block = config.kThreadNum;
   dim3 grid(B * H);
