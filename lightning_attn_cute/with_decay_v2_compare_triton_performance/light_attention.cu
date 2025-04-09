@@ -384,5 +384,5 @@ torch::Tensor forward_with_decay(torch::Tensor q, torch::Tensor k, torch::Tensor
                                     (cute::half_t*) q_decay.data_ptr(),  (cute::half_t*) k_decay.data_ptr(),  (cute::half_t*) diag_decay.data_ptr(), (float*) block_decay.data_ptr());
 
   cudaDeviceSynchronize();
-  return return out;
+  return out;
 }
