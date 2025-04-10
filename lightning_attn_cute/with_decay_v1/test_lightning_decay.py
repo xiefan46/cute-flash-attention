@@ -65,7 +65,7 @@ def set_seed(seed=42):
     os.environ['PYTHONHASHSEED'] = str(seed)
     os.environ['CUBLAS_WORKSPACE_CONFIG'] = ':4096:8'  # 针对某些CUDA操作
 
-def print_decay_tensors(q, BLOCK = 128):
+def print_decay_tensors(q, BLOCK = 64):
     num_attention_heads = q.size(1)
     d = q.size(3)
     slope_rate = _build_slope_tensor(num_attention_heads).to(q.device)
@@ -117,9 +117,9 @@ def torch_lightning_attn(q, k, v, q_decay, k_decay, diag_decay, block_decay, BLO
 
 
     kv = torch.zeros(B, H, d, d).to(torch.float32).to(q.device)
-    kv_output = torch.zeros(NUM_BLOCK, d, d).to(kv.dtype).to(q.device)
-    o_inter_output = torch.zeros(NUM_BLOCK, BLOCK, d).to(torch.float16).to(q.device)
-    o_intra_output = torch.zeros(NUM_BLOCK, BLOCK, d).to(torch.float16).to(q.device)
+    kv_output = torch.zeros(NUM_BLOCK, B, H, d, d).to(kv.dtype).to(q.device)
+    o_inter_output = torch.zeros(NUM_BLOCK, B, H, BLOCK, d).to(torch.float16).to(q.device)
+    o_intra_output = torch.zeros(NUM_BLOCK, B, H, BLOCK, d).to(torch.float16).to(q.device)
 
     output = torch.empty((B, H, N, d), dtype=q.dtype, device=q.device)
     for i in range(NUM_BLOCK):
@@ -288,11 +288,11 @@ if __name__ == "__main__":
 
 
     set_seed(10086)
-    B = 1
-    H = 1
-    N = 256
+    B = 4
+    H = 16
+    N = 1024
     # NOTE: we only support d = 64!
-    d = 64
+    d = 96
 
 
     q = torch.randn(B, N, H, d).cuda().half()
