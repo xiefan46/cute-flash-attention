@@ -88,11 +88,7 @@ __forceinline__ __device__ auto fp32_to_fp16(Tensor& src_fp32) {
   return dest_fp16;
 }
 
-// TODO:
-// 1. smem要怎么处理才能避免相互覆盖的问题
-// 2. smem如何处理多stage
-// 3. gmem到smem的copy似乎没有流水线
-// 4. 给smem增加static check. 参考 https://github.com/NVIDIA/cutlass/blob/main/media/docs/cute/0x_gemm_tutorial.md
+
 template <typename config>
 __global__ void flash_forward(const half_t* q, const half_t* k, const half_t* v, half_t* o, const int B, const int H, const int N) {
   using namespace cute;
