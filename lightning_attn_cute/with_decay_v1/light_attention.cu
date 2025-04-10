@@ -444,7 +444,7 @@ std::tuple<torch::Tensor, torch::Tensor, torch::Tensor, torch::Tensor, torch::Te
 
   kernel<<<grid, block>>>((cute::half_t*)q.data_ptr(), (cute::half_t*)k.data_ptr(),
                                               (cute::half_t*)v.data_ptr(), (cute::half_t*)out.data_ptr(), B, H, N, (float*)kv_out.data_ptr(),
-                                    (cute::half_t*)o_inter_out.data_ptr(), (cute::half_t*)o_intra_out.data_ptr(),(cute::half_t*)q_decay_out.data_ptr()
+                                    (cute::half_t*)o_inter_out.data_ptr(), (cute::half_t*)o_intra_out.data_ptr(),(cute::half_t*)q_decay_out.data_ptr(),
                                     (cute::half_t*) q_decay.data_ptr(),  (cute::half_t*) k_decay.data_ptr(),  (cute::half_t*) diag_decay.data_ptr(), (float*) block_decay.data_ptr());
 
 
