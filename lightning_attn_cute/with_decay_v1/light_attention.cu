@@ -284,10 +284,10 @@ __global__ void flash_forward(const half_t* q, const half_t* k, const half_t* v,
 
         cute::copy(tBsKVt, tBrKVt);
 
-        Tensor tArQ_decay = make_tensor_like(tArQ);
+        Tensor tArQ_decay_f32 = make_tensor_like<float>(tArQ);
         clear(tArQ_decay);
-        cute::transform(q_decay_r, tArQ, tArQ_decay, multiply_op);
-
+        cute::transform(q_decay_r, tArQ, tArQ_decay_f32, multiply_op);
+		Tensor tArQ_decay = fp32_to_fp16(tArQ_decay_f32);
 //        if (thread0()) {
 //          PRINT_TENSOR("tArQ_decay", tArQ_decay);
 //        }
