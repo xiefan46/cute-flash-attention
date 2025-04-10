@@ -219,13 +219,15 @@ def test_forward_with_decay(q, k, v, myflash):
     print("✅ o intra result maches")
 
     for i in range(num_block):
-        print(f"torch_o_inter_out shape: {torch_q_decay_out[i].shape}")
-        print(f"cute_o_inter_out shape: {cute_q_decay_out[i].shape}")
+        print(f"torch_q_decay_out shape: {torch_q_decay_out[i].shape}")
+        print(f"cute_q_decay_out shape: {cute_q_decay_out[i].shape}")
+        print(f"torch_q_decay_out dtype: {torch_q_decay_out[i].dtype}")
+        print(f"cute_q_decay_out dtype: {cute_q_decay_out[i].dtype}")
         torch.testing.assert_close(
             torch_q_decay_out[i],
             cute_q_decay_out[i],
         )
-    print("✅ o inter result matches")
+    print("✅ q_decay_out  result matches")
 
     for i in range(num_block):
         print(f"torch_o_inter_out shape: {torch_o_inter_out[i].shape}")
