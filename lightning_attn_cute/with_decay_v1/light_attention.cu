@@ -92,9 +92,10 @@ __forceinline__ __device__ auto fp32_to_fp16(Tensor& src_fp32) {
 template<typename Tensor>
 __forceinline__ __device__ auto fp16_to_fp32(Tensor& src_fp16) {
   using namespace cute;
-  auto dest_fp32 = make_tensor_like<half_t>(src_fp16);
-  auto src_fp16x2 = recast<float2>(src_fp16);
-  auto dest_fp32x2 = recast<half2>(dest_fp32);
+  auto dest_fp32 = make_tensor_like<float>(src_fp16);
+  auto src_fp16x2 = recast<half2>(src_fp16);
+  auto dest_fp32x2 = recast<float2>(dest_fp32);
+
 #pragma unroll
   for (int si = 0; si < size(dest_fp32x2); si++) {
     dest_fp32x2(si) = __half22float2_rn(src_fp16x2(si));
