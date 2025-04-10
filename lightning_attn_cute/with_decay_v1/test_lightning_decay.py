@@ -275,7 +275,7 @@ if __name__ == "__main__":
                    )
 
 
-    set_seed(100861)
+    set_seed(666)
     B = 16
     H = 64
     N = 2048
