@@ -198,8 +198,8 @@ __global__ void flash_forward(const half_t* q, const half_t* k, const half_t* v,
     }
     __syncthreads();
 
-    // constexpr int block_id = 0;
-    for (int block_id = 0; block_id < num_block; block_id++) {
+    constexpr int block_id = 0;
+//    for (int block_id = 0; block_id < num_block; block_id++) {
         Tensor gQ = local_tile(Q, make_tile(Int<BLOCK>{}, Int<kHeadDim>{}), make_coord(block_id, 0)); //BLOCK x d
         Tensor gK = local_tile(K, make_tile(Int<BLOCK>{}, Int<kHeadDim>{}), make_coord(block_id, 0)); //BLOCK x d
         Tensor gKt = local_tile(Kt, make_tile(Int<kHeadDim>{}, Int<BLOCK>{}), make_coord(0, block_id)); // d x BLOCK
@@ -320,13 +320,15 @@ __global__ void flash_forward(const half_t* q, const half_t* k, const half_t* v,
 //            PRINT_TENSOR("tArKt_decay tensor before", tArKt_decay);
 //            PRINT_TENSOR("kt_decay_r", kt_decay_r);
 //        }
-        assert(kt_decay_r.layout() == tArKt.layout());
-        assert(kt_decay_r.layout() == tArKt_decay.layout());
+
+
+//        assert(kt_decay_r.layout() == tArKt.layout());
+//        assert(kt_decay_r.layout() == tArKt_decay.layout());
         // cute::transform(kt_decay_r, tArKt, tArKt_decay, multiply_op);
-//        if (thread0()) {
-//            PRINT_TENSOR("tArKt", tArKt);
-//            PRINT_TENSOR("tArKt_decay tensor after", tArKt_decay);
-//        }
+        if (thread0()) {
+            PRINT_TENSOR("tArKt", tArKt);
+            PRINT_TENSOR("tArKt_decay tensor after", tArKt_decay);
+        }
 
         Tensor tCrNewKV = thr_mma.partition_fragment_C(sKV);
         Tensor tCsKV = thr_mma.partition_C(sKV);
@@ -350,7 +352,7 @@ __global__ void flash_forward(const half_t* q, const half_t* k, const half_t* v,
         cute::axpby(1.0f, tCrNewKV_f16, 1.0f, tCsKV);
         __syncthreads();
 
-     } // end of for loop
+//     } // end of for loop
 
 }
 
