@@ -79,7 +79,7 @@ def set_seed(seed=42):
 
 def test_forward_without_decay_precision(q, k, v):
     torch_output, torch_kv_output, torch_o_inter_out, torch_o_intra_out = lightning_attn_no_decay(q, k, v)
-    print(f"torch_output: {torch_output}, torch_kv_output: {torch_kv_output, }, torch_o_inter_out: {torch_o_inter_out}, torch_o_intra_out: {torch_o_intra_out}")
+    print(f"torch_kv_output: {torch_kv_output, }")
     # cute_output, cute_kv_output, cute_o_inter_out, cute_o_intra_out = myflash.forward_without_decay_precision(q, k, v)
     #
     # BLOCK = 64
