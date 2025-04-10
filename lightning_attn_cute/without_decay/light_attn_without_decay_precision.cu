@@ -29,7 +29,7 @@ namespace config {
 using namespace cute;
 
 // BLOCK 用于外层for循环, q, k, v三个矩阵每次切出来 BLOCK x d大小的矩阵加载到smem
-template <typename T_, int kHeadDim_ = 64, int BLOCK_ = 64>
+template <typename T_, int kHeadDim_ = 96, int BLOCK_ = 64>
 struct FlashConfig {
   using T = T_;
   static constexpr int kHeadDim = kHeadDim_;
@@ -110,6 +110,7 @@ __global__ void flash_forward(const half_t* q, const half_t* k, const half_t* v,
   const int bs_head_offset = bx * N * kHeadDim;
   const int num_block = (N + BLOCK - 1) / BLOCK;
 
+
   __shared__ float smem_kv[kHeadDim * kHeadDim];
 //  for (int i = tx; i < kHeadDim * kHeadDim; i += blockDim.x) {
 //    smem_kv[i] = __float2half(0.0f);
@@ -121,6 +122,14 @@ __global__ void flash_forward(const half_t* q, const half_t* k, const half_t* v,
   Tensor Kt = make_tensor(make_gmem_ptr<half_t>(k + bs_head_offset), make_shape(Int<kHeadDim>{}, N), make_stride(Int<1>{}, Int<kHeadDim>{})); // d x N
   Tensor Vt = make_tensor(make_gmem_ptr<half_t>(v + bs_head_offset), make_shape(Int<kHeadDim>{}, N), make_stride(Int<1>{}, Int<kHeadDim>{})); // d x N
   Tensor O = make_tensor(make_gmem_ptr<half_t>(o + bs_head_offset), make_shape(N, Int<kHeadDim>{}), make_stride(Int<kHeadDim>{}, Int<1>{})); // N x d
+
+  // debug info
+  // auto kv_out = torch::zeros({B, H, num_block, d, d}, torch::TensorOptions().dtype(torch::kFloat32).device(torch::Device(torch::kCUDA, 0)));
+//  auto o_inter_out = torch::zeros({B, H, num_block, BLOCK, d}, torch::TensorOptions().dtype(torch::kFloat16).device(torch::Device(torch::kCUDA, 0)));
+//  auto o_intra_out = torch::zeros({B, H, num_block, BLOCK, d}, torch::TensorOptions().dtype(torch::kFloat16).device(torch::Device(torch::kCUDA, 0)));
+  Tensor KV_OUT = make_tensor(make_gmem_ptr<float>(kv_out + bx * num_block * kHeadDim * kHeadDim), make_shape(N, Int<kHeadDim>{}), make_stride(Int<kHeadDim>{}, Int<1>{})); // N x d
+  Tensor O_INTER_OUT = make_tensor(make_gmem_ptr<half_t>(o_inter_out + bx * num_block * BLOCK * kHeadDim), make_shape(N, Int<kHeadDim>{}), make_stride(Int<kHeadDim>{}, Int<1>{})); // N x d
+  Tensor O_INTRA_OUT = make_tensor(make_gmem_ptr<half_t>(o_intra_out + bx * num_block * BLOCK * kHeadDim), make_shape(N, Int<kHeadDim>{}), make_stride(Int<kHeadDim>{}, Int<1>{})); // N x d
 
 
   Tensor sKV = make_tensor(make_smem_ptr<float>(&smem_kv), make_shape(Int<kHeadDim>{}, Int<kHeadDim>{}), make_stride(Int<kHeadDim>{},Int<1>{}));
@@ -181,7 +190,7 @@ __global__ void flash_forward(const half_t* q, const half_t* k, const half_t* v,
 
 
     // output debug info
-    Tensor O_intra = make_tensor(make_gmem_ptr<half_t>(o_intra_out + block_id * BLOCK * kHeadDim),
+    Tensor O_intra = make_tensor(make_gmem_ptr<half_t>(o_intra_out + bx * num_block * BLOCK * kHeadDim + block_id * BLOCK * kHeadDim),
                              make_shape(Int<BLOCK>{}, Int<kHeadDim>{}), make_stride(Int<kHeadDim>{}, Int<1>{})); // d x d
     Tensor gO_intra = thr_mma.partition_C(O_intra);
     cute::copy(tOrO_intra_f16, gO_intra);
@@ -200,7 +209,7 @@ __global__ void flash_forward(const half_t* q, const half_t* k, const half_t* v,
     Tensor tCrO_inter_f16 = fp32_to_fp16(tCrO_inter);
 
     // output debug info
-    Tensor O_inter = make_tensor(make_gmem_ptr<half_t>(o_inter_out + block_id * BLOCK * kHeadDim),
+    Tensor O_inter = make_tensor(make_gmem_ptr<half_t>(o_inter_out + block_id * BLOCK * kHeadDim + bx * num_block * BLOCK * kHeadDim),
                              make_shape(Int<BLOCK>{}, Int<kHeadDim>{}), make_stride(Int<kHeadDim>{}, Int<1>{})); // d x d
     Tensor gO_inter = thr_mma.partition_C(O_inter);
     cute::copy(tCrO_inter_f16, gO_inter);
@@ -235,7 +244,8 @@ __global__ void flash_forward(const half_t* q, const half_t* k, const half_t* v,
     cute::axpby(1.0f, tCrNewKV_f16, 1.0f, tCsKV);
 
 
-    Tensor gKV = make_tensor(make_gmem_ptr<float>(kv_out + block_id * kHeadDim * kHeadDim),
+    // output debug info
+    Tensor gKV = make_tensor(make_gmem_ptr<float>(kv_out + bx * num_block * kHeadDim * kHeadDim + block_id * kHeadDim * kHeadDim),
                              make_shape(Int<kHeadDim>{}, Int<kHeadDim>{}), make_stride(Int<kHeadDim>{}, Int<1>{})); // d x d
 
     Tensor tCgKV = thr_mma.partition_C(gKV);
@@ -261,10 +271,11 @@ std::tuple<torch::Tensor, torch::Tensor, torch::Tensor, torch::Tensor> forward_w
 
   PRINT("num_block", num_block);
 
-  auto kv_out = torch::zeros({num_block, d, d}, torch::TensorOptions().dtype(torch::kFloat32).device(torch::Device(torch::kCUDA, 0)));
 
-  auto o_inter_out = torch::zeros({num_block, BLOCK, d}, torch::TensorOptions().dtype(torch::kFloat16).device(torch::Device(torch::kCUDA, 0)));
-  auto o_intra_out = torch::zeros({num_block, BLOCK, d}, torch::TensorOptions().dtype(torch::kFloat16).device(torch::Device(torch::kCUDA, 0)));
+  auto kv_out = torch::zeros({B, H, num_block, d, d}, torch::TensorOptions().dtype(torch::kFloat32).device(torch::Device(torch::kCUDA, 0)));
+
+  auto o_inter_out = torch::zeros({B, H, num_block, BLOCK, d}, torch::TensorOptions().dtype(torch::kFloat16).device(torch::Device(torch::kCUDA, 0)));
+  auto o_intra_out = torch::zeros({B, H, num_block, BLOCK, d}, torch::TensorOptions().dtype(torch::kFloat16).device(torch::Device(torch::kCUDA, 0)));
 
   auto out = torch::empty_like(q);
 
@@ -281,107 +292,9 @@ std::tuple<torch::Tensor, torch::Tensor, torch::Tensor, torch::Tensor> forward_w
                                     (cute::half_t*)o_inter_out.data_ptr(), (cute::half_t*)o_intra_out.data_ptr());
 
   cudaDeviceSynchronize();
-  return std::make_tuple(out, kv_out, o_inter_out, o_intra_out);
-}
 
-
-
-template <typename config>
-__global__ void compute_kv_kernel(const half_t* k, const half_t* v, float* kv_out, const int B, const int H, const int N)
-{
-  using namespace cute;
-  using TiledMMA = typename config::TiledMMA;
-
-
-  constexpr int BLOCK = config::BLOCK;
-  constexpr int kHeadDim = config::kHeadDim;
-
-
-  const int bx = blockIdx.x;
-  const int tx = threadIdx.x;
-  const int bs_head_offset = bx * N * kHeadDim;
-  const int num_block = (N + BLOCK - 1) / BLOCK;
-
-  __shared__ float smem_kv[kHeadDim * kHeadDim];
-  Tensor Kt = make_tensor(make_gmem_ptr<half_t>(k + bs_head_offset), make_shape(Int<kHeadDim>{}, N), make_stride(Int<1>{}, Int<kHeadDim>{})); // d x N
-  Tensor Vt = make_tensor(make_gmem_ptr<half_t>(v + bs_head_offset), make_shape(Int<kHeadDim>{}, N), make_stride(Int<1>{}, Int<kHeadDim>{})); // d x N
-
-  Tensor sKV = make_tensor(make_smem_ptr<float>(&smem_kv), make_shape(Int<kHeadDim>{}, Int<kHeadDim>{}), make_stride(Int<kHeadDim>{},Int<1>{}));
-
-  TiledMMA mma;
-  ThrMMA thr_mma = mma.get_slice(tx);
-
-  Tensor tCsKV = thr_mma.partition_C(sKV);
-  clear(tCsKV);
-
-  if (thread0()) {
-    PRINT("mma size", size(mma));
-    PRINT("num_block", num_block);
-  }
-
-  for (int block_id = 0; block_id < num_block; block_id++) {
-
-    Tensor gKt = local_tile(Kt, make_tile(Int<kHeadDim>{}, Int<BLOCK>{}), make_coord(0, block_id)); // d x BLOCK
-    Tensor gVt = local_tile(Vt, make_tile(Int<kHeadDim>{}, Int<BLOCK>{}), make_coord(0, block_id)); //d x BLOCK
-    // Update KV
-    // new_kv = tl.dot(k_t, v) d x BLOCK @ d x BLOCK = d x  d
-    // kv = kv * block_decay + new_kv, block_decay = 1.0
-    Tensor tAgKt = thr_mma.partition_A(gKt);
-    Tensor tArKt = thr_mma.partition_fragment_A(gKt);
-    Tensor tBgVt = thr_mma.partition_B(gVt);
-    Tensor tBrVt = thr_mma.partition_fragment_B(gVt);
-
-    cute::copy(tAgKt, tArKt);
-    cute::copy(tBgVt, tBrVt);
-
-    Tensor tCrNewKV = thr_mma.partition_fragment_C(sKV);
-    clear(tCrNewKV);
-    cute::gemm(mma, tArKt, tBrVt, tCrNewKV);
-
-    __syncthreads();
-
-    cute::axpby(1.0, tCrNewKV, 1.0, tCsKV);
-
-    __syncthreads();
-
-    Tensor gKV = make_tensor(make_gmem_ptr<float>(kv_out + block_id * kHeadDim * kHeadDim),
-                             make_shape(Int<kHeadDim>{}, Int<kHeadDim>{}), make_stride(Int<kHeadDim>{}, Int<1>{})); // d x d
-
-    Tensor tCgKV = thr_mma.partition_C(gKV);
-    // copy kv result to global
-    cute::copy(tCsKV, tCgKV);
-
-
-    __syncthreads();
-  }
-
-}
-
-
-torch::Tensor cute_compute_kv(torch::Tensor k, torch::Tensor v) {
-    int B = k.size(0);
-    int H = k.size(1);
-    int N = k.size(2);
-    int d = k.size(3);
-
-    int BLOCK = 64;
-    int num_block = (N + BLOCK - 1) / BLOCK;
-
-    PRINT("num_block", num_block);
-
-    auto kv_out = torch::zeros({num_block, d, d}, torch::TensorOptions().dtype(torch::kFloat32).device(torch::Device(torch::kCUDA, 0)));
-
-
-    // only for head_dim=64
-    config::FlashConfig<cute::half_t> config;
-    dim3 block = config.kThreadNum;
-    dim3 grid(B * H);
-    auto partition_kernel = compute_kv_kernel<decltype(config)>;
-    PRINT("grid", grid);
-    PRINT("block", block);
-
-    partition_kernel<<<grid, block>>>((cute::half_t*)k.data_ptr(), (cute::half_t*)v.data_ptr(), (float*)kv_out.data_ptr(), B, H, N);
-    cudaDeviceSynchronize();
-
-    return kv_out;
+  torch::Tensor kv_out_final = kv_out.permute({2, 0, 1, 3, 4}).contiguous();
+  torch::Tensor o_inter_out_final = o_inter_out.permute({2, 0, 1, 3, 4}).contiguous();
+  torch::Tensor o_intra_out_final = o_intra_out.permute({2, 0, 1, 3, 4}).contiguous();
+  return std::make_tuple(out, kv_out_final, o_inter_out_final, o_intra_out_final);
 }

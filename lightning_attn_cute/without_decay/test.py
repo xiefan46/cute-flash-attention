@@ -79,72 +79,72 @@ def set_seed(seed=42):
 
 def test_forward_without_decay_precision(q, k, v):
     torch_output, torch_kv_output, torch_o_inter_out, torch_o_intra_out = lightning_attn_no_decay(q, k, v)
-    print(f"torch_o_intra_out: {torch_o_intra_out, }")
-    # cute_output, cute_kv_output, cute_o_inter_out, cute_o_intra_out = myflash.forward_without_decay_precision(q, k, v)
-    #
-    # BLOCK = 64
-    # B, H, N, d = q.shape
-    # num_block = (N + BLOCK - 1) // BLOCK
-    #
-    # print(f"num_block : {num_block}")
-    #
-    # for i in range(num_block):
-    #     print(f"torch_kv_output shape: {torch_kv_output[i].shape}")
-    #     print(f"cute_kv_output shape: {cute_kv_output[i].shape}")
-    #     torch.testing.assert_close(
-    #         torch_kv_output[i],
-    #         cute_kv_output[i],
-    #         rtol=1e-3,
-    #         atol=1e-5,
-    #         msg=f"block : {i}, KV results are different.torch_kv_output: {torch_kv_output[i]}. cute_kv_output: {cute_kv_output[i]}",
-    #     )
-    # print("✅ kv results match")
-    #
-    # for i in range(num_block):
-    #     print(f"torch_o_intra_out shape: {torch_o_intra_out[i].shape}")
-    #     print(f"cute_o_intra_out shape: {cute_o_intra_out[i].shape}")
-    #     print(f"torch_o_intra_out dtype/device: {torch_o_intra_out[i].dtype} device: {torch_o_intra_out[i].device}")
-    #     print(f"cute_o_intra_out dtype/device: {cute_o_intra_out[i].dtype}, device: {cute_o_intra_out[i].device}")
-    #     torch.testing.assert_close(
-    #         torch_o_intra_out[i],
-    #         cute_o_intra_out[i],
-    #         # rtol=1e-3,
-    #         # atol=1e-2,
-    #         msg=f"block : {i}, o_intra results are different.torch_o_intra_out: {torch_o_intra_out[i]}, cute_o_intra_out: {cute_o_intra_out[i]}",
-    #     )
-    # print("✅ o intra result maches")
-    #
-    # for i in range(num_block):
-    #     print(f"torch_o_inter_out shape: {torch_o_inter_out[i].shape}")
-    #     print(f"cute_o_inter_out shape: {cute_o_inter_out[i].shape}")
-    #     torch.testing.assert_close(
-    #         torch_o_inter_out[i],
-    #         cute_o_inter_out[i],
-    #         # rtol=1e-3,
-    #         # atol=1e-2,
-    #         msg=f"block : {i},  o inter results are different. torch_o_inter_out: {torch_o_inter_out[i]}, cute_o_inter_out: {cute_o_inter_out[i]}",
-    #     )
-    # print("✅ o inter result matches")
-    #
-    #
-    #
-    #
-    # for i in range(num_block):
-    #     b_torch_output = torch_output[:, :, i * BLOCK : (i + 1) * BLOCK]
-    #     b_cute_output =  cute_output[:, :, i * BLOCK : (i + 1) * BLOCK]
-    #
-    #     print(f"block: {i}, b_torch_output shape: {b_torch_output.shape}. value: {b_torch_output}")
-    #     print(f"block: {i}, b_cute_output shape: {b_cute_output.shape}. value: {b_cute_output}")
-    #
-    #     torch.testing.assert_close(
-    #         b_torch_output,
-    #         b_cute_output,
-    #         # rtol=1e-3,
-    #         # atol=1e-2,
-    #         msg=f"block: {i}, Lightning attention implementations produce different results",
-    #     )
-    #
-    # print("✅ Two implementations match")
+    
+    cute_output, cute_kv_output, cute_o_inter_out, cute_o_intra_out = myflash.forward_without_decay_precision(q, k, v)
+
+    BLOCK = 64
+    B, H, N, d = q.shape
+    num_block = (N + BLOCK - 1) // BLOCK
+
+    print(f"num_block : {num_block}")
+
+    for i in range(num_block):
+        print(f"torch_kv_output shape: {torch_kv_output[i].shape}")
+        print(f"cute_kv_output shape: {cute_kv_output[i].shape}")
+        torch.testing.assert_close(
+            torch_kv_output[i],
+            cute_kv_output[i],
+            rtol=1e-3,
+            atol=1e-5,
+            msg=f"block : {i}, KV results are different.torch_kv_output: {torch_kv_output[i]}. cute_kv_output: {cute_kv_output[i]}",
+        )
+    print("✅ kv results match")
+
+    for i in range(num_block):
+        print(f"torch_o_intra_out shape: {torch_o_intra_out[i].shape}")
+        print(f"cute_o_intra_out shape: {cute_o_intra_out[i].shape}")
+        print(f"torch_o_intra_out dtype/device: {torch_o_intra_out[i].dtype} device: {torch_o_intra_out[i].device}")
+        print(f"cute_o_intra_out dtype/device: {cute_o_intra_out[i].dtype}, device: {cute_o_intra_out[i].device}")
+        torch.testing.assert_close(
+            torch_o_intra_out[i],
+            cute_o_intra_out[i],
+            # rtol=1e-3,
+            # atol=1e-2,
+            msg=f"block : {i}, o_intra results are different.torch_o_intra_out: {torch_o_intra_out[i]}, cute_o_intra_out: {cute_o_intra_out[i]}",
+        )
+    print("✅ o intra result maches")
+
+    for i in range(num_block):
+        print(f"torch_o_inter_out shape: {torch_o_inter_out[i].shape}")
+        print(f"cute_o_inter_out shape: {cute_o_inter_out[i].shape}")
+        torch.testing.assert_close(
+            torch_o_inter_out[i],
+            cute_o_inter_out[i],
+            # rtol=1e-3,
+            # atol=1e-2,
+            msg=f"block : {i},  o inter results are different. torch_o_inter_out: {torch_o_inter_out[i]}, cute_o_inter_out: {cute_o_inter_out[i]}",
+        )
+    print("✅ o inter result matches")
+
+
+
+
+    for i in range(num_block):
+        b_torch_output = torch_output[:, :, i * BLOCK : (i + 1) * BLOCK]
+        b_cute_output =  cute_output[:, :, i * BLOCK : (i + 1) * BLOCK]
+
+        print(f"block: {i}, b_torch_output shape: {b_torch_output.shape}. value: {b_torch_output}")
+        print(f"block: {i}, b_cute_output shape: {b_cute_output.shape}. value: {b_cute_output}")
+
+        torch.testing.assert_close(
+            b_torch_output,
+            b_cute_output,
+            # rtol=1e-3,
+            # atol=1e-2,
+            msg=f"block: {i}, Lightning attention implementations produce different results",
+        )
+
+    print("✅ Two implementations match")
 
 
 if __name__ == "__main__":
