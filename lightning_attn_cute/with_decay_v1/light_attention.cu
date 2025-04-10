@@ -155,7 +155,7 @@ __forceinline__ __device__ auto load_decay_tensor_diag_block(const half_t* data_
 // block_decay float [H]
 template <typename config>
 __global__ void flash_forward(const half_t* q, const half_t* k, const half_t* v, half_t* o, const int B, const int H, const int N, float* kv_out,
-                              half_t* o_inter_out, half_t* o_intra_out, half_t* q_decay, half_t* k_decay, half_t* diag_decay, float* block_decay) {
+                              half_t* o_inter_out, half_t* o_intra_out, half_t* q_decay_out, half_t* q_decay, half_t* k_decay, half_t* diag_decay, float* block_decay) {
     using namespace cute;
     using TiledMMA = typename config::TiledMMA;
 
@@ -431,7 +431,7 @@ std::tuple<torch::Tensor, torch::Tensor, torch::Tensor, torch::Tensor> forward_w
 
   auto o_inter_out = torch::zeros({B, H, num_block, BLOCK, d}, torch::TensorOptions().dtype(torch::kFloat16).device(torch::Device(torch::kCUDA, 0)));
   auto o_intra_out = torch::zeros({B, H, num_block, BLOCK, d}, torch::TensorOptions().dtype(torch::kFloat16).device(torch::Device(torch::kCUDA, 0)));
-
+  auto q_decay_out = torch::zeros({B, H, num_block, BLOCK, d}, torch::TensorOptions().dtype(torch::kFloat16).device(torch::Device(torch::kCUDA, 0)));
   auto out = torch::empty_like(q);
 
   // only for head_dim=64
@@ -444,7 +444,7 @@ std::tuple<torch::Tensor, torch::Tensor, torch::Tensor, torch::Tensor> forward_w
 
   kernel<<<grid, block>>>((cute::half_t*)q.data_ptr(), (cute::half_t*)k.data_ptr(),
                                               (cute::half_t*)v.data_ptr(), (cute::half_t*)out.data_ptr(), B, H, N, (float*)kv_out.data_ptr(),
-                                    (cute::half_t*)o_inter_out.data_ptr(), (cute::half_t*)o_intra_out.data_ptr(),
+                                    (cute::half_t*)o_inter_out.data_ptr(), (cute::half_t*)o_intra_out.data_ptr(),(cute::half_t*)q_decay_out.data_ptr()
                                     (cute::half_t*) q_decay.data_ptr(),  (cute::half_t*) k_decay.data_ptr(),  (cute::half_t*) diag_decay.data_ptr(), (float*) block_decay.data_ptr());
 
 
@@ -454,5 +454,6 @@ std::tuple<torch::Tensor, torch::Tensor, torch::Tensor, torch::Tensor> forward_w
   torch::Tensor kv_out_final = kv_out.permute({2, 0, 1, 3, 4}).contiguous();
   torch::Tensor o_inter_out_final = o_inter_out.permute({2, 0, 1, 3, 4}).contiguous();
   torch::Tensor o_intra_out_final = o_intra_out.permute({2, 0, 1, 3, 4}).contiguous();
-  return std::make_tuple(out, kv_out_final, o_inter_out_final, o_intra_out_final);
+  torch::Tensor q_decay_out_final = q_decay_out.permute({2, 0, 1, 3, 4}).contiguous();
+  return std::make_tuple(out, kv_out_final, o_inter_out_final, o_intra_out_final, q_decay_out_final);
 }

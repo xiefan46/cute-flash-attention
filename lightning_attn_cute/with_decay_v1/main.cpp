@@ -4,7 +4,7 @@
 //torch::Tensor forward_with_decay(torch::Tensor q, torch::Tensor k, torch::Tensor v,
 //                                torch::Tensor q_decay, torch::Tensor k_decay, torch::Tensor diag_decay, torch::Tensor block_decay);
 
-std::tuple<torch::Tensor, torch::Tensor, torch::Tensor, torch::Tensor> forward_with_decay(torch::Tensor q, torch::Tensor k, torch::Tensor v,
+std::tuple<torch::Tensor, torch::Tensor, torch::Tensor, torch::Tensor, torch::Tensor> forward_with_decay(torch::Tensor q, torch::Tensor k, torch::Tensor v,
                                                                                            torch::Tensor q_decay, torch::Tensor k_decay, torch::Tensor diag_decay, torch::Tensor block_decay);
 
 
