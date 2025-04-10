@@ -201,9 +201,6 @@ def test_forward_with_decay(q, k, v, myflash):
         torch.testing.assert_close(
             torch_kv_output[i],
             cute_kv_output[i],
-            rtol=1e-3,
-            atol=1e-5,
-            msg=f"block : {i}, KV results are different.torch_kv_output: {torch_kv_output[i]}. cute_kv_output: {cute_kv_output[i]}",
         )
     print("✅ kv results match")
 
@@ -215,9 +212,6 @@ def test_forward_with_decay(q, k, v, myflash):
         torch.testing.assert_close(
             torch_o_intra_out[i],
             cute_o_intra_out[i],
-            # rtol=1e-3,
-            # atol=1e-2,
-            msg=f"block : {i}, o_intra results are different.torch_o_intra_out: {torch_o_intra_out[i]}, cute_o_intra_out: {cute_o_intra_out[i]}",
         )
     print("✅ o intra result maches")
 
@@ -227,9 +221,6 @@ def test_forward_with_decay(q, k, v, myflash):
         torch.testing.assert_close(
             torch_o_inter_out[i],
             cute_o_inter_out[i],
-            # rtol=1e-3,
-            # atol=1e-2,
-            msg=f"block : {i},  o inter results are different. torch_o_inter_out: {torch_o_inter_out[i]}, cute_o_inter_out: {cute_o_inter_out[i]}",
         )
     print("✅ o inter result matches")
 
@@ -244,9 +235,6 @@ def test_forward_with_decay(q, k, v, myflash):
         torch.testing.assert_close(
             b_torch_output,
             b_cute_output,
-            # rtol=1e-3,
-            # atol=1e-2,
-            msg=f"block: {i}, Lightning attention implementations produce different results",
         )
 
     print("✅ Two implementations match all tensor")
