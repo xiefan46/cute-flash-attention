@@ -183,7 +183,7 @@ if __name__ == "__main__":
 
 
     set_seed(10086)
-    B = 2
+    B = 16
     H = 64
     N = 1024
     # NOTE: we only support d = 96!
