@@ -415,7 +415,7 @@ __global__ void flash_forward(const half_t* q, const half_t* k, const half_t* v,
 
 
 // q [B, H, N, d] k  [B, H, N, d] v [B, H, N, d]
-std::tuple<torch::Tensor, torch::Tensor, torch::Tensor, torch::Tensor> forward_with_decay(torch::Tensor q, torch::Tensor k, torch::Tensor v,
+std::tuple<torch::Tensor, torch::Tensor, torch::Tensor, torch::Tensor, torch::Tensor> forward_with_decay(torch::Tensor q, torch::Tensor k, torch::Tensor v,
                                                                             torch::Tensor q_decay, torch::Tensor k_decay, torch::Tensor diag_decay, torch::Tensor block_decay) {
   int B = q.size(0);
   int H = q.size(1);
