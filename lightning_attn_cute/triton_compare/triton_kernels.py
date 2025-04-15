@@ -55,7 +55,7 @@ def fwd_kernel_v4(
 
 
         qk = tl.dot(q, k_t).to(tl.float16)
-        o_intra = tl.dot(qk * diag_decay, v).to(tl.float16)
+        o_intra = tl.dot((qk * diag_decay).to(tl.float16), v).to(tl.float16)
 
         kv_f16 = kv.to(tl.float16)
         qkv_inter = tl.dot(q, kv_f16).to(tl.float16)
@@ -64,8 +64,8 @@ def fwd_kernel_v4(
 
         tl.store(O_start + vo_off, o.to(O.dtype.element_ty), mask=block_off[:, None] < n)
 
-        new_kv = tl.dot(k_t * k_decay, v)
-        kv = kv * block_decay + new_kv
+        new_kv = tl.dot(k_t * k_decay, v).to(tl.float16)
+        kv = kv * block_decay + new_kv.to(tl.float32)
 
         block_off += BLOCK
 
