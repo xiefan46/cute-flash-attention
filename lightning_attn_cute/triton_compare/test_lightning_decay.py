@@ -8,6 +8,9 @@ import numpy as np
 from torch.cuda.amp import autocast, GradScaler
 import math
 
+from lightning_attn_cute.triton_compare.fwd_kernel_v3 import fwd_kernel_v3
+from lightning_attn_cute.triton_compare.lightning_attention_triton import lightning_attn_func
+
 
 # from flashinfer import single_prefill_with_kv_cache
 # from flash_attn import flash_attn_func
@@ -142,6 +145,7 @@ def assert_close(actual, expected, atol=1e-5, rtol=1e-3, max_mismatch_ratio=0.00
 
 def test_forward_with_decay(q, k, v, myflash):
 
+    # Step1: compare accuracy between cute and torch
     B, H, N, d = q.shape
     BLOCK = 64
     num_block = (N + BLOCK - 1) // BLOCK
@@ -260,6 +264,11 @@ def test_forward_with_decay(q, k, v, myflash):
     # assert_close(torch_output, cute_output)
 
     print("✅ Two implementations match all tensor")
+
+
+    # Step2: compare accuracy between triton and torch
+    triton_output = lightning_attn_func(q, k, v, slope_rate, fwd_kernel_v3)
+    assert_close(torch_output, triton_output)
 
 
 if __name__ == "__main__":
