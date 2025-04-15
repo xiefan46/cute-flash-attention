@@ -315,6 +315,7 @@ __global__ void flash_forward(const half_t* q, const half_t* k, const half_t* v,
         Tensor gQ_decay_out = thr_mma.partition_A(Q_decay_out);
 
         cute::copy(tArQ_decay, gQ_decay_out);
+        
 //        if (thread0()) {
 //          PRINT_TENSOR("tArQ_decay", tArQ_decay);
 //        }
