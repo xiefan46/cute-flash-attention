@@ -211,13 +211,6 @@ __global__ void flash_forward(const half_t* q, const half_t* k, const half_t* v,
         PRINT_TENSOR("diag_decay_r", diag_decay_r);
     }
 
-    auto multiply_op = [] (auto a, auto b) {
-        return a * b;
-    };
-
-    auto elementwise_add_op = [] (auto a, auto b) {
-        return a + b;
-    };
 
     for (int i = tx; i < kHeadDim * kHeadDim; i += blockDim.x) {
         smem_kv[i] = 0.0f; // 正确初始化为float类型
@@ -258,7 +251,12 @@ __global__ void flash_forward(const half_t* q, const half_t* k, const half_t* v,
 //        if (thread0()) {
 //          PRINT_TENSOR("tCrS_fp16_decay", tCrS_fp16_decay);
 //        }
-		cute::transform(diag_decay_r, tCrS_fp16, tCrS_fp16_decay, multiply_op);
+		// cute::transform(diag_decay_r, tCrS_fp16, tCrS_fp16_decay, multiply_op);
+
+        for (int si = 0; si < size(tCrS_fp16_decay); si++) {
+            tCrS_fp16_decay(si) = diag_decay_r(si) * tCrS_fp16(si);
+        }
+
 //        if (thread0()) {
 //            PRINT_TENSOR("tCrS_fp16_decay", tCrS_fp16_decay)
 //        }
@@ -312,10 +310,10 @@ __global__ void flash_forward(const half_t* q, const half_t* k, const half_t* v,
 		}
        Tensor Q_decay_out = make_tensor(make_gmem_ptr<half_t>(q_decay_out + block_id * BLOCK * kHeadDim + bx * num_block * BLOCK * kHeadDim),
                                  make_shape(Int<BLOCK>{}, Int<kHeadDim>{}), make_stride(Int<kHeadDim>{}, Int<1>{})); // d x d
-        Tensor gQ_decay_out = thr_mma.partition_A(Q_decay_out);
+       Tensor gQ_decay_out = thr_mma.partition_A(Q_decay_out);
 
-        cute::copy(tArQ_decay, gQ_decay_out);
-        
+       cute::copy(tArQ_decay, gQ_decay_out);
+
 //        if (thread0()) {
 //          PRINT_TENSOR("tArQ_decay", tArQ_decay);
 //        }
@@ -374,7 +372,12 @@ __global__ void flash_forward(const half_t* q, const half_t* k, const half_t* v,
 //        }
         assert(kt_decay_r.layout() == tArKt.layout());
         assert(kt_decay_r.layout() == tArKt_decay.layout());
-        cute::transform(kt_decay_r, tArKt, tArKt_decay, multiply_op);
+        // cute::transform(kt_decay_r, tArKt, tArKt_decay, multiply_op);
+
+        for (int si = 0; si < size(tArKt_decay); si++) {
+            tArKt_decay(si) = kt_decay_r(si) * tArKt(si);
+        }
+
 //        if (thread0()) {
 //            PRINT_TENSOR("tArKt", tArKt);
 //            PRINT_TENSOR("tArKt_decay tensor after", tArKt_decay);
