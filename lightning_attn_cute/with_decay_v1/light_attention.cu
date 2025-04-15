@@ -295,7 +295,11 @@ __global__ void flash_forward(const half_t* q, const half_t* k, const half_t* v,
 
         Tensor tBrKVt = thr_mma.partition_fragment_B(sKVt);
 
+        __syncthreads();
+
         cute::copy(tBsKVt, tBrKVt);
+
+        __syncthreads();
 
 //        Tensor q_decay_f32 = fp16_to_fp32(q_decay_r);
 //        Tensor tArQ_f32 = fp16_to_fp32(tArQ);
@@ -321,7 +325,7 @@ __global__ void flash_forward(const half_t* q, const half_t* k, const half_t* v,
         cute::gemm(mma, tArQ_decay, tBrKVt, tCrO_inter);
 
         Tensor tCrO_inter_f16 = fp32_to_fp16(tCrO_inter);
-        
+
 
 //        if (thread0()) {
 //          PRINT_TENSOR("tCrO_inter_f16", tCrO_inter_f16);
