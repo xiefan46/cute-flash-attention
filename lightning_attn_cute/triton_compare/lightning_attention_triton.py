@@ -6,7 +6,7 @@ import torch
 import torch.nn.functional as F
 import triton
 
-def lightning_attn2(q, k, v, s, kernel_impl):
+def lightning_attn2(q, k, v, s, kernel_impl, BLOCK):
     q = q.contiguous()
     k = k.contiguous()
     v = v.contiguous()
@@ -33,7 +33,6 @@ def lightning_attn2(q, k, v, s, kernel_impl):
 
     o_padded = torch.empty((b, h, n, e_padded), dtype=q.dtype, device=q.device)
 
-    BLOCK = 16
     NUM_BLOCK = triton.cdiv(q.shape[2], BLOCK)
     # parallel over channel
     BLOCK_MODEL = min(triton.next_power_of_2(e_padded), 32)
@@ -77,7 +76,7 @@ def next_power_of_2(n):
     return 2 ** (int(math.ceil(math.log(n, 2))))
 
 
-def lightning_attn_func(q, k, v, s, kernel_impl):
+def lightning_attn_func(q, k, v, s, kernel_impl, BLOCK):
     b, h, n, d = q.shape
     e = v.shape[-1]
     assert is_support(d) and is_support(e)
@@ -106,9 +105,9 @@ def lightning_attn_func(q, k, v, s, kernel_impl):
             end = arr[i + 1]
             q1 = q[..., start:end]
             k1 = k[..., start:end]
-            o += lightning_attn2(q1, k1, v, s, kernel_impl)
+            o += lightning_attn2(q1, k1, v, s, kernel_impl, BLOCK)
     else:
-        o = lightning_attn2(q, k, v, s, kernel_impl)
+        o = lightning_attn2(q, k, v, s, kernel_impl, BLOCK)
 
     if need_pad:
         o = o[:, :, :, :e]
