@@ -306,10 +306,10 @@ __global__ void flash_forward(const half_t* q, const half_t* k, const half_t* v,
                                  make_shape(Int<kHeadDim>{}, Int<kHeadDim>{}), make_stride(Int<1>{}, Int<kHeadDim>{})); // d x d
         Tensor tBgKVt_f16_out = thr_mma.partition_B(KVt_f16_out);
 
-        if (thread0()) {
-            PRINT("tBrKVt", tBrKVt);
-            PRINT("tBgKVt_f16_out", tBgKVt_f16_out);
-        }
+//        if (thread0()) {
+//            PRINT("tBrKVt", tBrKVt);
+//            PRINT("tBgKVt_f16_out", tBgKVt_f16_out);
+//        }
 
         cute::copy(tBrKVt, tBgKVt_f16_out);
 
