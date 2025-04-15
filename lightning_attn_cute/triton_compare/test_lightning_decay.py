@@ -65,41 +65,6 @@ def set_seed(seed=42):
     os.environ['PYTHONHASHSEED'] = str(seed)
     os.environ['CUBLAS_WORKSPACE_CONFIG'] = ':4096:8'  # 针对某些CUDA操作
 
-def print_decay_tensors(q, BLOCK = 64):
-    num_attention_heads = q.size(1)
-    d = q.size(3)
-    slope_rate = _build_slope_tensor(num_attention_heads).to(q.device)
-    array = torch.arange(BLOCK).to(q) + 1
-    q_decay = torch.exp(-slope_rate * array.reshape(-1, 1))
-    k_decay = torch.exp(-slope_rate * (BLOCK - array.reshape(-1, 1)))
-    index = array[:, None] - array[None, :]
-    s_index = (
-            slope_rate
-            * index[
-                None,
-                None,
-            ]
-    )
-    s_index = torch.where(index >= 0, -s_index, float("-inf"))
-    diag_decay = torch.exp(s_index)
-    block_decay = torch.exp(-slope_rate * BLOCK).squeeze()
-
-    print(f"slope_rate: {slope_rate.shape}, q_decay: {q_decay.shape}, k_decay: {k_decay.shape}, diag_decay: {diag_decay.shape}, block_decay: {block_decay.shape}")
-
-    print(f"q_decay: {q_decay}")
-
-    print(f"k_decay: {k_decay}")
-
-    print(f"q_decay expend: {q_decay.expand(-1, -1, d).shape}")
-
-    print(f"k_decay expend: {q_decay.expand(-1, -1, d).shape}")
-
-    print(f"diag_decay squeeze: {diag_decay.squeeze(dim=0).shape}")
-
-    print(f"block_decay expend: {block_decay.shape}")
-
-
-
 def torch_lightning_attn(q, k, v, q_decay, k_decay, diag_decay, block_decay, BLOCK):
 
     assert q.dtype == torch.float16
@@ -223,71 +188,76 @@ def test_forward_with_decay(q, k, v, myflash):
 
     cute_output, cute_kv_output, cute_o_inter_out, cute_o_intra_out, cute_q_decay_out, cute_kv_t_out = myflash.forward_with_decay(q, k, v, q_decay_cute, k_decay_cute, diag_decay_cute, block_decay_cute)
 
-    # for i in range(num_block):
-    #     print(f"torch_kv_output shape: {torch_kv_output[i].shape}")
-    #     print(f"cute_kv_output shape: {cute_kv_output[i].shape}")
-    #     torch.testing.assert_close(
-    #         torch_kv_output[i],
-    #         cute_kv_output[i],
-    #     )
-    # print("✅ kv results match")
-    #
-    # for i in range(num_block):
-    #     print(f"torch_o_intra_out shape: {torch_o_intra_out[i].shape}")
-    #     print(f"cute_o_intra_out shape: {cute_o_intra_out[i].shape}")
-    #     print(f"torch_o_intra_out dtype/device: {torch_o_intra_out[i].dtype} device: {torch_o_intra_out[i].device}")
-    #     print(f"cute_o_intra_out dtype/device: {cute_o_intra_out[i].dtype}, device: {cute_o_intra_out[i].device}")
-    #     torch.testing.assert_close(
-    #         torch_o_intra_out[i],
-    #         cute_o_intra_out[i],
-    #     )
-    # print("✅ o intra result maches")
-    #
-    # for i in range(num_block):
-    #     print(f"torch_q_decay_out shape: {torch_q_decay_out[i].shape}")
-    #     print(f"cute_q_decay_out shape: {cute_q_decay_out[i].shape}")
-    #     print(f"torch_q_decay_out dtype: {torch_q_decay_out[i].dtype}")
-    #     print(f"cute_q_decay_out dtype: {cute_q_decay_out[i].dtype}")
-    #     torch.testing.assert_close(
-    #         torch_q_decay_out[i],
-    #         cute_q_decay_out[i],
-    #     )
-    # print("✅ q_decay_out  result matches")
-    #
-    # for i in range(num_block):
-    #     print(f"torch_kv_t_out  shape: {torch_kv_t_out[i].shape}")
-    #     print(f"cute_kv_t_out shape: {cute_kv_t_out[i].shape}")
-    #     print(f"torch_kv_t_out dtype: {torch_kv_t_out[i].dtype}")
-    #     print(f"cute_kv_t_out dtype: {cute_kv_t_out[i].dtype}")
-    #     torch.testing.assert_close(
-    #         torch_kv_t_out[i],
-    #         cute_kv_t_out[i],
-    #     )
-    # print("✅ kv_t_out  result matches")
-    #
-    # for i in range(num_block):
-    #     print(f"torch_o_inter_out shape: {torch_o_inter_out[i].shape}")
-    #     print(f"cute_o_inter_out shape: {cute_o_inter_out[i].shape}")
-    #     torch.testing.assert_close(
-    #         torch_o_inter_out[i],
-    #         cute_o_inter_out[i],
-    #     )
-    # print("✅ o inter result matches")
+    for i in range(num_block):
+        print(f"torch_kv_output shape: {torch_kv_output[i].shape}")
+        print(f"cute_kv_output shape: {cute_kv_output[i].shape}")
+        # torch.testing.assert_close(
+        #     torch_kv_output[i],
+        #     cute_kv_output[i],
+        # )
+        assert_close(torch_kv_output[i], cute_kv_output[i])
+    print("✅ kv results match")
+
+    for i in range(num_block):
+        print(f"torch_o_intra_out shape: {torch_o_intra_out[i].shape}")
+        print(f"cute_o_intra_out shape: {cute_o_intra_out[i].shape}")
+        print(f"torch_o_intra_out dtype/device: {torch_o_intra_out[i].dtype} device: {torch_o_intra_out[i].device}")
+        print(f"cute_o_intra_out dtype/device: {cute_o_intra_out[i].dtype}, device: {cute_o_intra_out[i].device}")
+        # torch.testing.assert_close(
+        #     torch_o_intra_out[i],
+        #     cute_o_intra_out[i],
+        # )
+        assert_close(torch_o_intra_out[i], cute_o_intra_out[i])
+    print("✅ o intra result maches")
+
+    for i in range(num_block):
+        print(f"torch_q_decay_out shape: {torch_q_decay_out[i].shape}")
+        print(f"cute_q_decay_out shape: {cute_q_decay_out[i].shape}")
+        print(f"torch_q_decay_out dtype: {torch_q_decay_out[i].dtype}")
+        print(f"cute_q_decay_out dtype: {cute_q_decay_out[i].dtype}")
+        # torch.testing.assert_close(
+        #     torch_q_decay_out[i],
+        #     cute_q_decay_out[i],
+        # )
+        assert_close(torch_q_decay_out[i], cute_q_decay_out[i])
+    print("✅ q_decay_out  result matches")
+
+    for i in range(num_block):
+        print(f"torch_kv_t_out  shape: {torch_kv_t_out[i].shape}")
+        print(f"cute_kv_t_out shape: {cute_kv_t_out[i].shape}")
+        print(f"torch_kv_t_out dtype: {torch_kv_t_out[i].dtype}")
+        print(f"cute_kv_t_out dtype: {cute_kv_t_out[i].dtype}")
+        # torch.testing.assert_close(
+        #     torch_kv_t_out[i],
+        #     cute_kv_t_out[i],
+        # )
+        assert_close(torch_kv_t_out[i], cute_kv_t_out[i])
+    print("✅ kv_t_out  result matches")
+
+    for i in range(num_block):
+        print(f"torch_o_inter_out shape: {torch_o_inter_out[i].shape}")
+        print(f"cute_o_inter_out shape: {cute_o_inter_out[i].shape}")
+        # torch.testing.assert_close(
+        #     torch_o_inter_out[i],
+        #     cute_o_inter_out[i],
+        # )
+        assert_close(torch_o_inter_out[i], cute_o_inter_out[i])
+    print("✅ o inter result matches")
 
 
-    # for i in range(num_block):
-    #     b_torch_output = torch_output[:, :, i * BLOCK : (i + 1) * BLOCK]
-    #     b_cute_output =  cute_output[:, :, i * BLOCK : (i + 1) * BLOCK]
-    #
-    #     # print(f"block: {i}, b_torch_output shape: {b_torch_output.shape}. value: {b_torch_output}")
-    #     # print(f"block: {i}, b_cute_output shape: {b_cute_output.shape}. value: {b_cute_output}")
-    #
-    #     torch.testing.assert_close(
-    #         b_torch_output,
-    #         b_cute_output,
-    #     )
+    for i in range(num_block):
+        b_torch_output = torch_output[:, :, i * BLOCK : (i + 1) * BLOCK]
+        b_cute_output =  cute_output[:, :, i * BLOCK : (i + 1) * BLOCK]
 
-    assert_close(torch_output, cute_output)
+        # print(f"block: {i}, b_torch_output shape: {b_torch_output.shape}. value: {b_torch_output}")
+        # print(f"block: {i}, b_cute_output shape: {b_cute_output.shape}. value: {b_cute_output}")
+
+        # torch.testing.assert_close(
+        #     b_torch_output,
+        #     b_cute_output,
+        # )
+        assert_close(b_torch_output, b_cute_output)
+    # assert_close(torch_output, cute_output)
 
     print("✅ Two implementations match all tensor")
 

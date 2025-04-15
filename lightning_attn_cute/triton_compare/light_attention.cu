@@ -61,20 +61,6 @@ struct FlashConfig {
 
 
 
-//for i in range(NUM_BLOCK):
-//        q = tl.load(Q_start + q_off, mask=block_off[:, None] < n, other=0.0).to(tl.float32)
-//        k_t = tl.load(K_start + k_off, mask=block_off[None, :] < n, other=0.0).to(tl.float32)
-//        v = tl.load(V_start + vo_off, mask=block_off[:, None] < n, other=0.0).to(tl.float32)
-//        o_intra = tl.dot(tl.dot(q, k_t) * diag_decay, v)
-//
-//        o_inter = tl.dot(q, kv) * q_decay
-//        o = o_intra + o_inter
-//        tl.store(O_start + vo_off, o.to(O.dtype.element_ty), mask=block_off[:, None] < n)
-//        new_kv = tl.dot(k_t * k_decay, v)
-//        kv = kv * block_decay + new_kv
-//
-//        block_off += BLOCK
-
 
 template<typename Tensor>
 __forceinline__ __device__ auto fp32_to_fp16(Tensor& src_fp32) {
@@ -313,11 +299,6 @@ __global__ void flash_forward(const half_t* q, const half_t* k, const half_t* v,
 
         cute::copy(tBrKVt, tBgKVt_f16_out);
 
-//        Tensor q_decay_f32 = fp16_to_fp32(q_decay_r);
-//        Tensor tArQ_f32 = fp16_to_fp32(tArQ);
-//        Tensor tArQ_decay_f32 = make_tensor_like<float>(tArQ);
-//        clear(tArQ_decay_f32);
-//        cute::transform(q_decay_f32, tArQ_f32, tArQ_decay_f32, multiply_op);
 
         // output q_decay debug info
 		Tensor tArQ_decay = make_tensor_like(tArQ);
@@ -332,18 +313,12 @@ __global__ void flash_forward(const half_t* q, const half_t* k, const half_t* v,
 
        cute::copy(tArQ_decay, gQ_decay_out);
 
-//        if (thread0()) {
-//          PRINT_TENSOR("tArQ_decay", tArQ_decay);
-//        }
 
         cute::gemm(mma, tArQ_decay, tBrKVt, tCrO_inter);
 
         Tensor tCrO_inter_f16 = fp32_to_fp16(tCrO_inter);
 
 
-//        if (thread0()) {
-//          PRINT_TENSOR("tCrO_inter_f16", tCrO_inter_f16);
-//        }
 
         // output debug info
         Tensor O_inter = make_tensor(make_gmem_ptr<half_t>(o_inter_out + block_id * BLOCK * kHeadDim + bx * num_block * BLOCK * kHeadDim),
@@ -359,10 +334,7 @@ __global__ void flash_forward(const half_t* q, const half_t* k, const half_t* v,
         Tensor tCgO = thr_mma.partition_C(gO);
         cute::copy(tCrO_inter_f16, tCgO);
 
-//        if (thread0()) {
-//          PRINT_TENSOR("O_intra + O_inter", tCrO_inter_f16);
-//        }
-//
+
 //        // TODO: figure out __syncthreads()放在什么地方合适，特别注意那种需要多个view进行计算的，比如smem_kv
         __syncthreads();
         // Step5: Update KV
@@ -376,31 +348,19 @@ __global__ void flash_forward(const half_t* q, const half_t* k, const half_t* v,
         cute::copy(tAgKt, tArKt);
         cute::copy(tBgVt, tBrVt);
 
-//        if (thread0()) {
-//            // PRINT_TENSOR("tArKt tensor", tArKt);
-//            PRINT_TENSOR("tArKt", tArKt);
-//            PRINT_TENSOR("tBrVt", tBrVt);
-//        }
 
         Tensor tArKt_decay = make_tensor_like(tArKt);
 
         clear(tArKt_decay);
-//        if (thread0()) {
-//            PRINT_TENSOR("tArKt_decay tensor before", tArKt_decay);
-//            PRINT_TENSOR("kt_decay_r", kt_decay_r);
-//        }
+
         assert(kt_decay_r.layout() == tArKt.layout());
         assert(kt_decay_r.layout() == tArKt_decay.layout());
-        // cute::transform(kt_decay_r, tArKt, tArKt_decay, multiply_op);
+
 
         for (int si = 0; si < size(tArKt_decay); si++) {
             tArKt_decay(si) = kt_decay_r(si) * tArKt(si);
         }
 
-//        if (thread0()) {
-//            PRINT_TENSOR("tArKt", tArKt);
-//            PRINT_TENSOR("tArKt_decay tensor after", tArKt_decay);
-//        }
 
         Tensor tCrNewKV = thr_mma.partition_fragment_C(sKV);
         Tensor tCrNewKV_without_decay = thr_mma.partition_fragment_C(sKV);
@@ -408,28 +368,16 @@ __global__ void flash_forward(const half_t* q, const half_t* k, const half_t* v,
         clear(tCrNewKV);
         clear(tCrNewKV_without_decay);
 
-//        if (thread0()) {
-//          PRINT_TENSOR("tCrNewKV tensor before", tCrNewKV);
-//        }
+
 
         cute::gemm(mma, tArKt_decay, tBrVt, tCrNewKV);
         cute::gemm(mma, tArKt, tBrVt, tCrNewKV_without_decay);
 
-//        if (thread0()) {
-//          PRINT_TENSOR("tArKt_decay", tArKt_decay);
-//          PRINT_TENSOR("tBrVt", tBrVt);
-//          PRINT_TENSOR("tCrNewKV", tCrNewKV);
-//          PRINT_TENSOR("tCrNewKV_without_decay", tCrNewKV_without_decay);
-//        }
 
         Tensor tCrNewKV_f16 =  fp32_to_fp16(tCrNewKV);
 
         cute::axpby(1.0f, tCrNewKV_f16, block_decay_r, tCsKV);
 
-//        if (thread0()) {
-//          PRINT_TENSOR("tCrNewKV_f16", tCrNewKV_f16);
-//          PRINT_TENSOR("tCsKV", tCsKV);
-//        }
 
 
         // output debug info
