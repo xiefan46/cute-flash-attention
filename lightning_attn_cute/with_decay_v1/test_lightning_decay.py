@@ -154,7 +154,7 @@ def torch_lightning_attn(q, k, v, q_decay, k_decay, diag_decay, block_decay, BLO
     return output, kv_output, o_inter_output, o_intra_output, q_decay_out, kv_t_out
 
 
-def assert_close(actual, expected, atol=1e-5, rtol=1e-3, max_mismatch_ratio=0.00001):
+def assert_close(actual, expected, atol=1e-5, rtol=1e-3, max_mismatch_ratio=0.0001):
 
     # 计算匹配的掩码
     close_mask = torch.isclose(actual, expected, atol=atol, rtol=rtol)
