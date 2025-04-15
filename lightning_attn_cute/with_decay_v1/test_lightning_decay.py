@@ -156,15 +156,12 @@ def torch_lightning_attn(q, k, v, q_decay, k_decay, diag_decay, block_decay, BLO
 
 def assert_close(actual, expected, atol=1e-5, rtol=1e-3, max_mismatch_ratio=0.0001):
 
-    # 计算匹配的掩码
     close_mask = torch.isclose(actual, expected, atol=atol, rtol=rtol)
 
-    # 统计不匹配数量
     mismatch_count = (~close_mask).sum().item()
     total_elements = close_mask.numel()
     mismatch_ratio = mismatch_count / total_elements
 
-    # 检查比例是否超过阈值
     if mismatch_ratio > max_mismatch_ratio:
         abs_diff = torch.abs(actual - expected)
         rel_diff = torch.abs((actual - expected) / torch.where(expected != 0, expected, torch.ones_like(expected)))

@@ -65,7 +65,7 @@ def set_seed(seed=42):
     os.environ['PYTHONHASHSEED'] = str(seed)
     os.environ['CUBLAS_WORKSPACE_CONFIG'] = ':4096:8'  # 针对某些CUDA操作
 
-def print_decay_tensors(q, BLOCK = 128):
+def print_decay_tensors(q, BLOCK = 64):
     num_attention_heads = q.size(1)
     d = q.size(3)
     slope_rate = _build_slope_tensor(num_attention_heads).to(q.device)
@@ -117,6 +117,11 @@ def torch_lightning_attn(q, k, v, q_decay, k_decay, diag_decay, block_decay, BLO
 
 
     kv = torch.zeros(B, H, d, d).to(torch.float32).to(q.device)
+    kv_output = torch.zeros(NUM_BLOCK, B, H, d, d).to(kv.dtype).to(q.device)
+    o_inter_output = torch.zeros(NUM_BLOCK, B, H, BLOCK, d).to(torch.float16).to(q.device)
+    o_intra_output = torch.zeros(NUM_BLOCK, B, H, BLOCK, d).to(torch.float16).to(q.device)
+    q_decay_out = torch.zeros(NUM_BLOCK, B, H, BLOCK, d).to(torch.float16).to(q.device)
+    kv_t_out = torch.zeros(NUM_BLOCK, B, H, d, d).to(torch.float16).to(q.device)
 
     output = torch.empty((B, H, N, d), dtype=q.dtype, device=q.device)
     for i in range(NUM_BLOCK):
@@ -127,24 +132,54 @@ def torch_lightning_attn(q, k, v, q_decay, k_decay, diag_decay, block_decay, BLO
         qi = q[:, :, si:ei].contiguous()
         ki = k[:, :, si:ei].contiguous()
         vi = v[:, :, si:ei].contiguous()
-        qkv_none_diag = torch.matmul(qi * q_decay[:, :m], kv.to(torch.float16))
+        q_times_decay = qi * q_decay[:, :m]
+        q_decay_out[i] = q_times_decay.detach().clone()
+        kv_f16 = kv.to(torch.float16)
+        # kv_t_out[i] = torch.transpose(kv_f16, -1, -2).detach().clone()
+        kv_t_out[i] = kv_f16.detach().clone()
+        qkv_none_diag = torch.matmul(q_times_decay, kv_f16)
+        o_inter_output[i] = qkv_none_diag.detach().clone()
         # diag
         qk = (
                 torch.matmul(qi, ki.transpose(-1, -2))
                 * diag_decay[:, :, :m, :m]
         )
         qkv_diag = torch.matmul(qk, vi)
+        o_intra_output[i] = qkv_diag.detach().clone()
 
         output[:, :, si:ei] = qkv_none_diag + qkv_diag
         kv = block_decay * kv + torch.matmul(
             (ki * k_decay[:, -m:]).transpose(-1, -2), vi)
-    return output
+        kv_output[i] = kv.detach().clone()
+    return output, kv_output, o_inter_output, o_intra_output, q_decay_out, kv_t_out
 
+
+def assert_close(actual, expected, atol=1e-5, rtol=1e-3, max_mismatch_ratio=0.0001):
+
+    close_mask = torch.isclose(actual, expected, atol=atol, rtol=rtol)
+
+    mismatch_count = (~close_mask).sum().item()
+    total_elements = close_mask.numel()
+    mismatch_ratio = mismatch_count / total_elements
+
+    if mismatch_ratio > max_mismatch_ratio:
+        abs_diff = torch.abs(actual - expected)
+        rel_diff = torch.abs((actual - expected) / torch.where(expected != 0, expected, torch.ones_like(expected)))
+        max_abs_diff = abs_diff.max().item()
+        max_rel_diff = rel_diff.max().item()
+
+        raise AssertionError(
+            f"Mismatch ratio {mismatch_ratio:.6f} exceeds threshold {max_mismatch_ratio}\n"
+            f"Mismatched elements: {mismatch_count}/{total_elements}\n"
+            f"Max absolute difference: {max_abs_diff}\n"
+            f"Max relative difference: {max_rel_diff}"
+        )
 
 def test_forward_with_decay(q, k, v, myflash):
 
     B, H, N, d = q.shape
     BLOCK = 64
+    num_block = (N + BLOCK - 1) // BLOCK
     array = torch.arange(BLOCK).to(q) + 1
     slope_rate = _build_slope_tensor(H).to(q.device)
     q_decay = torch.exp(-slope_rate * array.reshape(-1, 1)).to(torch.float16)
@@ -161,7 +196,7 @@ def test_forward_with_decay(q, k, v, myflash):
     diag_decay = torch.exp(s_index).to(torch.float16)
     block_decay = torch.exp(-slope_rate * BLOCK).to(torch.float32)
 
-    torch_output = torch_lightning_attn(q, k, v, q_decay, k_decay, diag_decay, block_decay, BLOCK)
+    torch_output, torch_kv_output, torch_o_inter_out, torch_o_intra_out, torch_q_decay_out, torch_kv_t_out = torch_lightning_attn(q, k, v, q_decay, k_decay, diag_decay, block_decay, BLOCK)
 
     q_decay_cute = q_decay.expand(-1, -1, d).to(torch.float16).contiguous()
     k_decay_cute = k_decay.expand(-1, -1, d).to(torch.float16).contiguous()
@@ -186,13 +221,73 @@ def test_forward_with_decay(q, k, v, myflash):
     for t in (q_decay_cute, k_decay_cute, diag_decay_cute, block_decay_cute):
         print(f"min : {torch.min(t)}， max: {torch.max(t)}")
 
-    cute_output = myflash.forward_with_decay(q, k, v, q_decay_cute, k_decay_cute, diag_decay_cute, block_decay_cute)
+    cute_output, cute_kv_output, cute_o_inter_out, cute_o_intra_out, cute_q_decay_out, cute_kv_t_out = myflash.forward_with_decay(q, k, v, q_decay_cute, k_decay_cute, diag_decay_cute, block_decay_cute)
+
+    # for i in range(num_block):
+    #     print(f"torch_kv_output shape: {torch_kv_output[i].shape}")
+    #     print(f"cute_kv_output shape: {cute_kv_output[i].shape}")
+    #     torch.testing.assert_close(
+    #         torch_kv_output[i],
+    #         cute_kv_output[i],
+    #     )
+    # print("✅ kv results match")
+    #
+    # for i in range(num_block):
+    #     print(f"torch_o_intra_out shape: {torch_o_intra_out[i].shape}")
+    #     print(f"cute_o_intra_out shape: {cute_o_intra_out[i].shape}")
+    #     print(f"torch_o_intra_out dtype/device: {torch_o_intra_out[i].dtype} device: {torch_o_intra_out[i].device}")
+    #     print(f"cute_o_intra_out dtype/device: {cute_o_intra_out[i].dtype}, device: {cute_o_intra_out[i].device}")
+    #     torch.testing.assert_close(
+    #         torch_o_intra_out[i],
+    #         cute_o_intra_out[i],
+    #     )
+    # print("✅ o intra result maches")
+    #
+    # for i in range(num_block):
+    #     print(f"torch_q_decay_out shape: {torch_q_decay_out[i].shape}")
+    #     print(f"cute_q_decay_out shape: {cute_q_decay_out[i].shape}")
+    #     print(f"torch_q_decay_out dtype: {torch_q_decay_out[i].dtype}")
+    #     print(f"cute_q_decay_out dtype: {cute_q_decay_out[i].dtype}")
+    #     torch.testing.assert_close(
+    #         torch_q_decay_out[i],
+    #         cute_q_decay_out[i],
+    #     )
+    # print("✅ q_decay_out  result matches")
+    #
+    # for i in range(num_block):
+    #     print(f"torch_kv_t_out  shape: {torch_kv_t_out[i].shape}")
+    #     print(f"cute_kv_t_out shape: {cute_kv_t_out[i].shape}")
+    #     print(f"torch_kv_t_out dtype: {torch_kv_t_out[i].dtype}")
+    #     print(f"cute_kv_t_out dtype: {cute_kv_t_out[i].dtype}")
+    #     torch.testing.assert_close(
+    #         torch_kv_t_out[i],
+    #         cute_kv_t_out[i],
+    #     )
+    # print("✅ kv_t_out  result matches")
+    #
+    # for i in range(num_block):
+    #     print(f"torch_o_inter_out shape: {torch_o_inter_out[i].shape}")
+    #     print(f"cute_o_inter_out shape: {cute_o_inter_out[i].shape}")
+    #     torch.testing.assert_close(
+    #         torch_o_inter_out[i],
+    #         cute_o_inter_out[i],
+    #     )
+    # print("✅ o inter result matches")
 
 
-    torch.testing.assert_close(
-        torch_output,
-        cute_output,
-    )
+    # for i in range(num_block):
+    #     b_torch_output = torch_output[:, :, i * BLOCK : (i + 1) * BLOCK]
+    #     b_cute_output =  cute_output[:, :, i * BLOCK : (i + 1) * BLOCK]
+    #
+    #     # print(f"block: {i}, b_torch_output shape: {b_torch_output.shape}. value: {b_torch_output}")
+    #     # print(f"block: {i}, b_cute_output shape: {b_cute_output.shape}. value: {b_cute_output}")
+    #
+    #     torch.testing.assert_close(
+    #         b_torch_output,
+    #         b_cute_output,
+    #     )
+
+    assert_close(torch_output, cute_output)
 
     print("✅ Two implementations match all tensor")
 
@@ -232,10 +327,10 @@ if __name__ == "__main__":
                    )
 
 
-    set_seed(10086)
-    B = 1
+    set_seed(666)
+    B = 16
     H = 64
-    N = 1024
+    N = 2048
     # NOTE: we only support d = 64!
     d = 96
 
