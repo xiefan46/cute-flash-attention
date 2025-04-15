@@ -135,8 +135,9 @@ def torch_lightning_attn(q, k, v, q_decay, k_decay, diag_decay, block_decay, BLO
         q_times_decay = qi * q_decay[:, :m]
         q_decay_out[i] = q_times_decay.detach().clone()
         kv_f16 = kv.to(torch.float16)
-        kv_t_out[i] = torch.transpose(kv_f16, -1, -2).detach().clone()
-        qkv_none_diag = torch.matmul(q_times_decay, kv.to(torch.float16))
+        # kv_t_out[i] = torch.transpose(kv_f16, -1, -2).detach().clone()
+        kv_t_out[i] = kv_f16.detach().clone()
+        qkv_none_diag = torch.matmul(q_times_decay, kv_f16)
         o_inter_output[i] = qkv_none_diag.detach().clone()
         # diag
         qk = (
