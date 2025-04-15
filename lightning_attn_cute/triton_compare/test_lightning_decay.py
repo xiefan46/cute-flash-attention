@@ -8,7 +8,7 @@ import numpy as np
 from torch.cuda.amp import autocast, GradScaler
 import math
 
-from fwd_kernel_v3 import fwd_kernel_v3
+from triton_kernels import fwd_kernel_v3
 from lightning_attention_triton import lightning_attn_func
 
 
