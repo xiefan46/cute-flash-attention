@@ -296,7 +296,7 @@ __global__ void flash_forward(const half_t* q, const half_t* k, const half_t* v,
         Tensor tBrKVt = thr_mma.partition_fragment_B(sKVt);
 
         if (thread0()) {
-          PRINT(tBrKVt);
+          PRINT("tBrKVt", tBrKVt);
         }
 
         __syncthreads();
