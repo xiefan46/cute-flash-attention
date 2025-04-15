@@ -217,8 +217,8 @@ __global__ void flash_forward(const half_t* q, const half_t* k, const half_t* v,
     }
     __syncthreads();
 
-    // constexpr int block_id = 0;
-    for (int block_id = 0; block_id < num_block; block_id++) {
+     constexpr int block_id = 0;
+//    for (int block_id = 0; block_id < num_block; block_id++) {
         Tensor gQ = local_tile(Q, make_tile(Int<BLOCK>{}, Int<kHeadDim>{}), make_coord(block_id, 0)); //BLOCK x d
         Tensor gK = local_tile(K, make_tile(Int<BLOCK>{}, Int<kHeadDim>{}), make_coord(block_id, 0)); //BLOCK x d
         Tensor gKt = local_tile(Kt, make_tile(Int<kHeadDim>{}, Int<BLOCK>{}), make_coord(0, block_id)); // d x BLOCK
@@ -294,6 +294,10 @@ __global__ void flash_forward(const half_t* q, const half_t* k, const half_t* v,
         cute::clear(tCrO_inter);
 
         Tensor tBrKVt = thr_mma.partition_fragment_B(sKVt);
+
+        if (thread0()) {
+          PRINT(tBrKVt);
+        }
 
         __syncthreads();
 
@@ -432,7 +436,7 @@ __global__ void flash_forward(const half_t* q, const half_t* k, const half_t* v,
         // copy kv result to global
         cute::copy(tCsKV, tCgKV);
         __syncthreads();
-     } // end of for loop
+//     } // end of for loop
 
 }
 
