@@ -8,8 +8,8 @@ import numpy as np
 from torch.cuda.amp import autocast, GradScaler
 import math
 
-from lightning_attn_cute.triton_compare.fwd_kernel_v3 import fwd_kernel_v3
-from lightning_attn_cute.triton_compare.lightning_attention_triton import lightning_attn_func
+import fwd_kernel_v3
+from lightning_attention_triton import lightning_attn_func
 
 
 # from flashinfer import single_prefill_with_kv_cache
