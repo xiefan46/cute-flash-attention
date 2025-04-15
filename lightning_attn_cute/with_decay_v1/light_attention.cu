@@ -217,8 +217,8 @@ __global__ void flash_forward(const half_t* q, const half_t* k, const half_t* v,
     }
     __syncthreads();
 
-     constexpr int block_id = 0;
-//    for (int block_id = 0; block_id < num_block; block_id++) {
+     //constexpr int block_id = 0;
+    for (int block_id = 0; block_id < num_block; block_id++) {
         Tensor gQ = local_tile(Q, make_tile(Int<BLOCK>{}, Int<kHeadDim>{}), make_coord(block_id, 0)); //BLOCK x d
         Tensor gK = local_tile(K, make_tile(Int<BLOCK>{}, Int<kHeadDim>{}), make_coord(block_id, 0)); //BLOCK x d
         Tensor gKt = local_tile(Kt, make_tile(Int<kHeadDim>{}, Int<BLOCK>{}), make_coord(0, block_id)); // d x BLOCK
@@ -338,7 +338,7 @@ __global__ void flash_forward(const half_t* q, const half_t* k, const half_t* v,
 
         cute::gemm(mma, tArQ_decay, tBrKVt, tCrO_inter);
 
-        Tensor tCrO_inter_f16 = fp32_to_fp16(tCrO_inter);
+        // Tensor tCrO_inter_f16 = fp32_to_fp16(tCrO_inter);
 
 
 //        if (thread0()) {
@@ -349,7 +349,7 @@ __global__ void flash_forward(const half_t* q, const half_t* k, const half_t* v,
         Tensor O_inter = make_tensor(make_gmem_ptr<half_t>(o_inter_out + block_id * BLOCK * kHeadDim + bx * num_block * BLOCK * kHeadDim),
                                  make_shape(Int<BLOCK>{}, Int<kHeadDim>{}), make_stride(Int<kHeadDim>{}, Int<1>{})); // d x d
         Tensor gO_inter = thr_mma.partition_C(O_inter);
-        cute::copy(tCrO_inter_f16, gO_inter);
+        cute::copy(tCrO_inter, gO_inter);
 
 
         // Step 4: compute O = O_intra + O_inter
@@ -440,7 +440,7 @@ __global__ void flash_forward(const half_t* q, const half_t* k, const half_t* v,
         // copy kv result to global
         cute::copy(tCsKV, tCgKV);
         __syncthreads();
-//     } // end of for loop
+     } // end of for loop
 
 }
 
