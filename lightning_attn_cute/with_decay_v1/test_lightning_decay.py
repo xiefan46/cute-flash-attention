@@ -258,8 +258,8 @@ def test_forward_with_decay(q, k, v, myflash):
         b_torch_output = torch_output[:, :, i * BLOCK : (i + 1) * BLOCK]
         b_cute_output =  cute_output[:, :, i * BLOCK : (i + 1) * BLOCK]
 
-        print(f"block: {i}, b_torch_output shape: {b_torch_output.shape}. value: {b_torch_output}")
-        print(f"block: {i}, b_cute_output shape: {b_cute_output.shape}. value: {b_cute_output}")
+        # print(f"block: {i}, b_torch_output shape: {b_torch_output.shape}. value: {b_torch_output}")
+        # print(f"block: {i}, b_cute_output shape: {b_cute_output.shape}. value: {b_cute_output}")
 
         torch.testing.assert_close(
             b_torch_output,
