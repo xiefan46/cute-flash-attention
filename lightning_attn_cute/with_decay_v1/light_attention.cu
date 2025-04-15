@@ -338,7 +338,7 @@ __global__ void flash_forward(const half_t* q, const half_t* k, const half_t* v,
 
         cute::gemm(mma, tArQ_decay, tBrKVt, tCrO_inter);
 
-        // Tensor tCrO_inter_f16 = fp32_to_fp16(tCrO_inter);
+        Tensor tCrO_inter_f16 = fp32_to_fp16(tCrO_inter);
 
 
 //        if (thread0()) {
