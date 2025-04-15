@@ -205,11 +205,11 @@ __global__ void flash_forward(const half_t* q, const half_t* k, const half_t* v,
     Tensor diag_decay_r = load_decay_tensor_diag_block<decltype(thr_mma), config>(diag_decay, thr_mma, head_id);
     float block_decay_r = block_decay[head_id];
 
-    if (thread0()) {
-      	PRINT_TENSOR("q_decay_r", q_decay_r);
-        PRINT_TENSOR("kt_decay_r", kt_decay_r);
-        PRINT_TENSOR("diag_decay_r", diag_decay_r);
-    }
+//    if (thread0()) {
+//      	PRINT_TENSOR("q_decay_r", q_decay_r);
+//        PRINT_TENSOR("kt_decay_r", kt_decay_r);
+//        PRINT_TENSOR("diag_decay_r", diag_decay_r);
+//    }
 
 
     for (int i = tx; i < kHeadDim * kHeadDim; i += blockDim.x) {
