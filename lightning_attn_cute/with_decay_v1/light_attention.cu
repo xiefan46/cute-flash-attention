@@ -299,12 +299,22 @@ __global__ void flash_forward(const half_t* q, const half_t* k, const half_t* v,
 
         cute::copy(tBsKVt, tBrKVt);
 
-        Tensor q_decay_f32 = fp16_to_fp32(q_decay_r);
-        Tensor tArQ_f32 = fp16_to_fp32(tArQ);
-        Tensor tArQ_decay_f32 = make_tensor_like<float>(tArQ);
-        clear(tArQ_decay_f32);
-        cute::transform(q_decay_f32, tArQ_f32, tArQ_decay_f32, multiply_op);
-		Tensor tArQ_decay = fp32_to_fp16(tArQ_decay_f32);
+//        Tensor q_decay_f32 = fp16_to_fp32(q_decay_r);
+//        Tensor tArQ_f32 = fp16_to_fp32(tArQ);
+//        Tensor tArQ_decay_f32 = make_tensor_like<float>(tArQ);
+//        clear(tArQ_decay_f32);
+//        cute::transform(q_decay_f32, tArQ_f32, tArQ_decay_f32, multiply_op);
+		Tensor tArQ_decay = make_tensor_like(tArQ);
+        clear(tArQ_decay);
+		#pragma unroll
+		for (int si = 0; si < size(tArQ_decay); si++) {
+    		tArQ_decay(si) = q_decay_r(si) * tArQ(si);
+		}
+       Tensor Q_decay_out = make_tensor(make_gmem_ptr<half_t>(q_decay_out + block_id * BLOCK * kHeadDim + bx * num_block * BLOCK * kHeadDim),
+                                 make_shape(Int<BLOCK>{}, Int<kHeadDim>{}), make_stride(Int<kHeadDim>{}, Int<1>{})); // d x d
+        Tensor gQ_decay_out = thr_mma.partition_A(Q_decay_out);
+
+        cute::copy(tArQ_decay, gQ_decay_out);
 //        if (thread0()) {
 //          PRINT_TENSOR("tArQ_decay", tArQ_decay);
 //        }
