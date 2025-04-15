@@ -8,7 +8,7 @@ import numpy as np
 from torch.cuda.amp import autocast, GradScaler
 import math
 
-from triton_kernels import fwd_kernel_v3
+from triton_kernels import fwd_kernel_v4
 from lightning_attention_triton import lightning_attn_func
 
 
@@ -267,7 +267,7 @@ def test_forward_with_decay(q, k, v, myflash):
 
 
     # Step2: compare accuracy between triton and torch
-    triton_output = lightning_attn_func(q, k, v, slope_rate, fwd_kernel_v3)
+    triton_output = lightning_attn_func(q, k, v, slope_rate, fwd_kernel_v4)
     assert_close(torch_output, triton_output)
 
 
@@ -306,7 +306,7 @@ if __name__ == "__main__":
                    )
 
 
-    set_seed(666)
+    set_seed(10086)
     B = 16
     H = 64
     N = 2048
