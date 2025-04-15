@@ -28,13 +28,13 @@ def fwd_kernel_v4(
     # decay
     head_off = bx % h
     slope = tl.load(S + head_off).to(tl.float32)
-    q_decay = tl.exp(-slope * block_off[:, None])
-    k_decay = tl.exp(-slope * (BLOCK - block_off[None, :]))
+    q_decay = tl.exp(-slope * block_off[:, None]).to(tl.float16)
+    k_decay = tl.exp(-slope * (BLOCK - block_off[None, :])).to(tl.float16)
     block_decay = tl.exp(-slope * BLOCK)
     index = block_off[:, None] - block_off[None, :]  # 相对位置 BLOCK x BLOCK
     s_index = -slope * index  # BLOCK * BLOCK
     s_index = tl.where(index >= 0, s_index, float("-inf"))
-    diag_decay = tl.exp(s_index)
+    diag_decay = tl.exp(s_index).to(tl.float16)
 
     kv = tl.zeros((d, BLOCK_MODEL), dtype=tl.float32)
 
@@ -45,13 +45,13 @@ def fwd_kernel_v4(
 
     for i in range(NUM_BLOCK):
         q_off = block_off[:, None] * d
-        q = tl.load(Q_start + q_off, mask=block_off[:, None] < n, other=0.0).to(tl.float32)
+        q = tl.load(Q_start + q_off, mask=block_off[:, None] < n, other=0.0).to(tl.float16)
 
         k_off = block_off[None, :] * d
-        k_t = tl.load(K_start + k_off, mask=block_off[None, :] < n, other=0.0).to(tl.float32)
+        k_t = tl.load(K_start + k_off, mask=block_off[None, :] < n, other=0.0).to(tl.float16)
 
         vo_off = block_off[:, None] * e
-        v = tl.load(V_start + vo_off, mask=block_off[:, None] < n, other=0.0).to(tl.float32)
+        v = tl.load(V_start + vo_off, mask=block_off[:, None] < n, other=0.0).to(tl.float16)
 
         o_intra = tl.dot(tl.dot(q, k_t) * diag_decay, v)
         o_inter = tl.dot(q, kv) * q_decay
