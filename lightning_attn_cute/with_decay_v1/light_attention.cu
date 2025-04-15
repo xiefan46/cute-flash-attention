@@ -295,9 +295,7 @@ __global__ void flash_forward(const half_t* q, const half_t* k, const half_t* v,
 
         Tensor tBrKVt = thr_mma.partition_fragment_B(sKVt);
 
-        if (thread0()) {
-          PRINT("tBrKVt", tBrKVt);
-        }
+
 
         __syncthreads();
 
@@ -307,6 +305,12 @@ __global__ void flash_forward(const half_t* q, const half_t* k, const half_t* v,
         Tensor KVt_f16_out = make_tensor(make_gmem_ptr<half_t>(kv_t_f16_out + block_id * kHeadDim * kHeadDim + bx * num_block * kHeadDim * kHeadDim),
                                  make_shape(Int<kHeadDim>{}, Int<kHeadDim>{}), make_stride(Int<1>{}, Int<kHeadDim>{})); // d x d
         Tensor tBgKVt_f16_out = thr_mma.partition_B(KVt_f16_out);
+
+        if (thread0()) {
+            PRINT("tBrKVt", tBrKVt);
+            PRINT("tBgKVt_f16_out", tBgKVt_f16_out);
+        }
+
         cute::copy(tBrKVt, tBgKVt_f16_out);
 
 //        Tensor q_decay_f32 = fp16_to_fp32(q_decay_r);
