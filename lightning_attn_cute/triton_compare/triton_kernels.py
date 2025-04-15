@@ -2,7 +2,7 @@ import triton
 import triton.language as tl
 
 
-
+@triton.jit
 def fwd_kernel_v4(
         Q,
         K,
