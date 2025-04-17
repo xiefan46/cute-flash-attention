@@ -314,6 +314,8 @@ def test_forward_with_decay(q, k, v, myflash):
     print("✅ o intra result maches")
 
     for i in range(num_block):
+        print(f"torch_o_inter_out[i]: {triton_kv_output[i]}")
+        print(f"triton_o_inter_output[i]: {triton_o_inter_output[i]}")
         assert_close(torch_o_inter_out[i], triton_o_inter_output[i])
     print("✅ o inter result matches")
 
