@@ -192,8 +192,9 @@ def get_random_qkv(B, H, N, d):
     return q1, k1, v1
 
 def run_benchmark(BLOCK):
-    batch_size_range = [2 ** i for i in range(0, 6)]
-    seq_length_range = [256, 512, 1024, 2048]
+    # batch_size_range = [2 ** i for i in range(0, 6)]
+    batch_size_range = [1, 4, 32]
+    seq_length_range = [256, 512, 1024]
     configs = list(itertools.product(batch_size_range, seq_length_range))
 
     @triton.testing.perf_report(
@@ -204,8 +205,8 @@ def run_benchmark(BLOCK):
             line_vals=["torch_native", "cute", "triton"],
             line_names=[
                 "torch_native",
-                "cute",
                 "triton",
+                "cute",
             ],
             styles=[("blue", "-"), ("green", "-"), ("red", "--")],
             ylabel="us",
@@ -278,7 +279,7 @@ if __name__ == "__main__":
     set_seed(10086)
     BLOCK = 64
     # make sure cute and triton implmentations are the same as torch
-    for i in range(1):
+    for i in range(3):
         q, k, v = get_random_qkv(B = 16, H = 64, N = 2048, d = 64)
         veryfy_correct_result(q, k, v, myflash, BLOCK)
 
