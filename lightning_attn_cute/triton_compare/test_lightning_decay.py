@@ -142,7 +142,7 @@ def assert_close(actual, expected, atol=1e-5, rtol=1e-3, max_mismatch_ratio=0.00
             f"Max relative difference: {max_rel_diff}"
         )
 
-def test_forward_with_decay(q, k, v, myflash):
+def veryfy_correct_result(q, k, v, myflash):
 
     # Step1: compare accuracy between cute and torch
     B, H, N, d = q.shape
@@ -283,14 +283,14 @@ def test_forward_with_decay(q, k, v, myflash):
     # block_decay = torch.exp(-slope_rate * BLOCK).to(torch.float32)
 
 
-    print(f"torch original q_decay: {q_decay}")
+    # print(f"torch original q_decay: {q_decay}")
 
 
 
-    print(f"torch q_decay shape: {q_decay.squeeze().shape}")
-    print(f"torch k_decay shape: {k_decay.squeeze().shape}")
-    print(f"torch diag_decay shape: {diag_decay.squeeze().shape}")
-    print(f"torch block_decay shape: {block_decay.squeeze().shape}")
+    # print(f"torch q_decay shape: {q_decay.squeeze().shape}")
+    # print(f"torch k_decay shape: {k_decay.squeeze().shape}")
+    # print(f"torch diag_decay shape: {diag_decay.squeeze().shape}")
+    # print(f"torch block_decay shape: {block_decay.squeeze().shape}")
 
     # print(f"triton_q_decay_out shape: {triton_q_decay_out[0].shape}, triton_k_decay_out: {triton_k_decay_out[0].shape}, triton_diag_decay_out shape: {triton_diag_decay_out[0].shape}, triton_block_decay_out shape: {triton_block_decay_out[0].shape}")
 
@@ -372,14 +372,14 @@ if __name__ == "__main__":
     # NOTE: we only support d = 64!
     d = 64
 
+    for i in range(5):
+        q = torch.randn(B, N, H, d).cuda().half()
+        k = torch.randn(B, N, H, d).cuda().half()
+        v = torch.randn(B, N, H, d).cuda().half()
+        q1 = q.transpose(1, 2).contiguous()
+        k1 = k.transpose(1, 2).contiguous()
+        v1 = v.transpose(1, 2).contiguous()
 
-    q = torch.randn(B, N, H, d).cuda().half()
-    k = torch.randn(B, N, H, d).cuda().half()
-    v = torch.randn(B, N, H, d).cuda().half()
-    q1 = q.transpose(1, 2).contiguous()
-    k1 = k.transpose(1, 2).contiguous()
-    v1 = v.transpose(1, 2).contiguous()
+        # make sure cute and triton implmentations are the same as torch
+        veryfy_correct_result(q1, k1, v1, myflash)
 
-    # print_decay_tensors(q1)
-
-    test_forward_with_decay(q1, k1, v1, myflash)
