@@ -39,7 +39,7 @@ def fwd_kernel_v4(
     vo_dim_off = tl.arange(0, BLOCK_MODEL) + by * BLOCK_MODEL
     k_row_off = tl.arange(0, d)
     # decay
-    batch_id = bx / h
+    batch_id = bx // h
     head_off = bx % h
     slope = tl.load(S + head_off).to(tl.float32)
     q_decay = tl.exp(-slope * block_off[:, None]).to(tl.float16)
@@ -143,8 +143,8 @@ def lightning_attn2(q, k, v, s, BLOCK):
     diag_decay_out = torch.empty((b, h, BLOCK, BLOCK), dtype=torch.float16, device=q.device)
     block_decay_out = torch.empty((b, h), dtype=torch.float32, device=q.device)
     kv_output = torch.empty((b, h, NUM_BLOCK, d, d), dtype=torch.float32, device=q.device)
-    o_inter_output = torch.empty((b, h, NUM_BLOCK, BLOCK, d), dtype=torch.float32, device=q.device)
-    o_intra_output = torch.empty((b, h, NUM_BLOCK, BLOCK, d), dtype=torch.float32, device=q.device)
+    o_inter_output = torch.empty((b, h, NUM_BLOCK, BLOCK, d), dtype=torch.float16, device=q.device)
+    o_intra_output = torch.empty((b, h, NUM_BLOCK, BLOCK, d), dtype=torch.float16, device=q.device)
 
     grid = (b * h, triton.cdiv(e_padded, BLOCK_MODEL))
 
