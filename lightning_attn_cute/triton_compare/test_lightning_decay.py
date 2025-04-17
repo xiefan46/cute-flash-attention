@@ -296,10 +296,10 @@ def test_forward_with_decay(q, k, v, myflash):
 
     # print(f"torch q_decay values: {q_decay.squeeze()[0]}, triton q decay values: {triton_q_decay_out[0, 0]}")
 
-    # torch.testing.assert_close(q_decay.squeeze(), triton_q_decay_out[0])
-    # torch.testing.assert_close(k_decay.squeeze(), triton_k_decay_out[0])
-    # torch.testing.assert_close(diag_decay.squeeze(), triton_diag_decay_out[0])
-    # torch.testing.assert_close(block_decay.squeeze(), triton_block_decay_out[0])
+    torch.testing.assert_close(q_decay.squeeze(), triton_q_decay_out[0])
+    torch.testing.assert_close(k_decay.squeeze(), triton_k_decay_out[0])
+    torch.testing.assert_close(diag_decay.squeeze(), triton_diag_decay_out[0])
+    torch.testing.assert_close(block_decay.squeeze(), triton_block_decay_out[0])
 
     print("✅ all decay match")
 

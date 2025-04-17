@@ -35,7 +35,7 @@ def fwd_kernel_v4(
     by = tl.program_id(1)
 
     block_off = tl.arange(0, BLOCK)
-    decay_block_off = block_off
+    decay_block_off = block_off + 1
     qk_dim_off = tl.arange(0, d)
     vo_dim_off = tl.arange(0, BLOCK_MODEL) + by * BLOCK_MODEL
     k_row_off = tl.arange(0, d)
