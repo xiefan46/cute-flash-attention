@@ -205,8 +205,8 @@ def run_benchmark(BLOCK):
             line_vals=["torch_native", "cute", "triton"],
             line_names=[
                 "torch_native",
-                "triton",
                 "cute",
+                "triton",
             ],
             styles=[("blue", "-"), ("green", "-"), ("red", "--")],
             ylabel="us",
