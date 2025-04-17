@@ -29,7 +29,7 @@ namespace config {
 using namespace cute;
 
 // BLOCK 用于外层for循环, q, k, v三个矩阵每次切出来 BLOCK x d大小的矩阵加载到smem
-template <typename T_, int kHeadDim_ = 96, int BLOCK_ = 64>
+template <typename T_, int kHeadDim_ = 128, int BLOCK_ = 64>
 struct FlashConfig {
   using T = T_;
   static constexpr int kHeadDim = kHeadDim_;
