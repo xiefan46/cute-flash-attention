@@ -292,9 +292,9 @@ def test_forward_with_decay(q, k, v, myflash):
     print(f"torch diag_decay shape: {diag_decay.squeeze().shape}")
     print(f"torch block_decay shape: {block_decay.squeeze().shape}")
 
-    print(f"triton_q_decay_out shape: {triton_q_decay_out[0].shape}, triton_k_decay_out: {triton_k_decay_out[0].shape}, triton_diag_decay_out shape: {triton_diag_decay_out[0].shape}, triton_block_decay_out shape: {triton_block_decay_out[0].shape}")
+    # print(f"triton_q_decay_out shape: {triton_q_decay_out[0].shape}, triton_k_decay_out: {triton_k_decay_out[0].shape}, triton_diag_decay_out shape: {triton_diag_decay_out[0].shape}, triton_block_decay_out shape: {triton_block_decay_out[0].shape}")
 
-    print(f"torch q_decay values: {q_decay.squeeze()[0]}, triton q decay values: {triton_q_decay_out[0, 0]}")
+    # print(f"torch q_decay values: {q_decay.squeeze()[0]}, triton q decay values: {triton_q_decay_out[0, 0]}")
 
     torch.testing.assert_close(q_decay.squeeze(), triton_q_decay_out[0])
     torch.testing.assert_close(k_decay.squeeze(), triton_k_decay_out[0])
@@ -366,8 +366,8 @@ if __name__ == "__main__":
 
 
     set_seed(10086)
-    B = 1
-    H = 16
+    B = 16
+    H = 64
     N = 2048
     # NOTE: we only support d = 64!
     d = 64
