@@ -301,6 +301,7 @@ def test_forward_with_decay(q, k, v, myflash):
     torch.testing.assert_close(diag_decay.squeeze(), triton_diag_decay_out[0])
     torch.testing.assert_close(block_decay.squeeze(), triton_block_decay_out[0])
 
+    print("✅ all decay match")
 
     for i in range(num_block):
         # print(f"triton_kv_output[i]: {triton_kv_output[i]}")
@@ -323,7 +324,7 @@ def test_forward_with_decay(q, k, v, myflash):
         assert_close(b_torch_output, b_triton_output)
 
 
-    print("✅ Torch and cute two implementations match all tensor")
+    print("✅ Torch and triton two implementations match all tensor")
 
 
 
