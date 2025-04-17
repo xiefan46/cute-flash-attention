@@ -103,10 +103,11 @@ def lightning_attn2(q, k, v, s, kernel_impl, BLOCK):
     o_padded = torch.empty((b, h, n, e_padded), dtype=q.dtype, device=q.device)
 
     # output debug info
-    q_decay_out = torch.empty((b, h, BLOCK), dtype=q.dtype, device=q.device)
-    k_decay_out = torch.empty((b, h, BLOCK), dtype=q.dtype, device=q.device)
-    diag_decay_out = torch.empty((b, h, BLOCK, BLOCK), dtype=q.dtype, device=q.device)
-    block_decay_out = torch.empty((b, h), dtype=q.dtype, device=q.device)
+    q_decay_out = torch.empty((b, h, BLOCK), dtype=torch.float16, device=q.device)
+    k_decay_out = torch.empty((b, h, BLOCK), dtype=torch.float16, device=q.device)
+    diag_decay_out = torch.empty((b, h, BLOCK, BLOCK), dtype=torch.float16, device=q.device)
+    block_decay_out = torch.empty((b, h, 1), dtype=torch.float32, device=q.device)
+
 
     NUM_BLOCK = triton.cdiv(q.shape[2], BLOCK)
     # parallel over channel
