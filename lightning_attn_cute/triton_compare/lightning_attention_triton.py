@@ -39,6 +39,7 @@ def fwd_kernel_v4(
     vo_dim_off = tl.arange(0, BLOCK_MODEL) + by * BLOCK_MODEL
     k_row_off = tl.arange(0, d)
     # decay
+    batch_id = bx / h
     head_off = bx % h
     slope = tl.load(S + head_off).to(tl.float32)
     q_decay = tl.exp(-slope * block_off[:, None]).to(tl.float16)
@@ -54,8 +55,17 @@ def fwd_kernel_v4(
     # tl.static_print(q_decay_off_debug[None, :])
     # tl.static_print(q_decay_off_debug)
 
-    q_decay_off = q_decay_out + bx * BLOCK + tl.arange(0, BLOCK)
-    tl.store(q_decay_off,  tl.reshape(q_decay, (BLOCK,)))
+    # output decay debug info
+    qk_decay_off = bx * BLOCK + tl.arange(0, BLOCK)
+    tl.store(q_decay_out + qk_decay_off,  tl.reshape(q_decay, (BLOCK,)))
+    tl.store(k_decay_out + qk_decay_off,  tl.reshape(k_decay, (BLOCK,)))
+
+    block_decay_off = batch_id * h + head_off
+    tl.store(block_decay_out + block_decay_off, block_decay)
+
+    diag_decay_off = diag_decay_out + bx * BLOCK * BLOCK + block_off[:, None] * BLOCK + block_off[None, :]
+    tl.store(diag_decay_off, diag_decay)
+
 
 
     kv = tl.zeros((d, BLOCK_MODEL), dtype=tl.float32)
@@ -131,7 +141,7 @@ def lightning_attn2(q, k, v, s, BLOCK):
     q_decay_out = torch.empty((b, h, BLOCK), dtype=torch.float16, device=q.device)
     k_decay_out = torch.empty((b, h, BLOCK), dtype=torch.float16, device=q.device)
     diag_decay_out = torch.empty((b, h, BLOCK, BLOCK), dtype=torch.float16, device=q.device)
-    block_decay_out = torch.empty((b, h, 1), dtype=torch.float32, device=q.device)
+    block_decay_out = torch.empty((b, h), dtype=torch.float32, device=q.device)
     kv_output = torch.empty((b, h, NUM_BLOCK, d, d), dtype=torch.float32, device=q.device)
     o_inter_output = torch.empty((b, h, NUM_BLOCK, BLOCK, d), dtype=torch.float32, device=q.device)
     o_intra_output = torch.empty((b, h, NUM_BLOCK, BLOCK, d), dtype=torch.float32, device=q.device)
@@ -219,6 +229,6 @@ def lightning_attn_func(q, k, v, s, BLOCK):
     if need_pad:
         o = o[:, :, :, :e]
 
-    print(f"[triton] q_decay_out: {q_decay_out}")
+    print(f"[triton] q_decay_out: {q_decay_out}, k_decay_out: {k_decay_out}, diag_decay_out: {diag_decay_out}, block_decay_out: {block_decay_out}")
 
     return o, q_decay_out, k_decay_out, diag_decay_out, block_decay_out, kv_output, o_inter_output, o_intra_output
