@@ -87,17 +87,30 @@ def fwd_kernel_v4(
 
 
         qk = tl.dot(q, k_t).to(tl.float16)
+
+        o_debug_off = BLOCK * d * bx * NUM_BLOCK + BLOCK * d * i
+
         o_intra = tl.dot((qk * diag_decay).to(tl.float16), v).to(tl.float16)
+
+        # output o_intra debug info
+        tl.store(o_intra_output + o_debug_off + tl.arange(0, BLOCK)[:, None] * d + tl.arange(0, d)[None, :], o_intra)
 
         kv_f16 = kv.to(tl.float16)
         qkv_inter = tl.dot(q, kv_f16).to(tl.float16)
         o_inter = (qkv_inter * q_decay).to(tl.float16)
+
+        # output o_inter debug info
+        tl.store(o_inter_output + o_debug_off + tl.arange(0, BLOCK)[:, None] * d + tl.arange(0, d)[None, :], o_inter)
+
         o = o_intra + o_inter
 
         tl.store(O_start + vo_off, o.to(O.dtype.element_ty), mask=block_off[:, None] < n)
 
         new_kv = tl.dot(k_t * k_decay, v).to(tl.float16)
         kv = kv * block_decay + new_kv.to(tl.float32)
+
+        # output kv debug info
+        tl.store(o_inter_output + o_debug_off + tl.arange(0, d)[:, None] * d + tl.arange(0, d)[None, :], kv)
 
         block_off += BLOCK
 
@@ -229,6 +242,6 @@ def lightning_attn_func(q, k, v, s, BLOCK):
     if need_pad:
         o = o[:, :, :, :e]
 
-    print(f"[triton] q_decay_out: {q_decay_out}, k_decay_out: {k_decay_out}, diag_decay_out: {diag_decay_out}, block_decay_out: {block_decay_out}")
+    print(f"[triton] q_decay_out: {q_decay_out}, k_decay_out: {k_decay_out}, diag_decay_out: {diag_decay_out}, block_decay_out: {block_decay_out}, o_inter_output: {o_inter_output}, o_intra_output: {o_intra_output}, kv_output: {kv_output}")
 
     return o, q_decay_out, k_decay_out, diag_decay_out, block_decay_out, kv_output, o_inter_output, o_intra_output
