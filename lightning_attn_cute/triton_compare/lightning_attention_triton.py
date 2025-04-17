@@ -97,8 +97,8 @@ def fwd_kernel_v4(
         tl.store(o_intra_output + o_debug_off + tl.arange(0, BLOCK)[:, None] * d + tl.arange(0, d)[None, :], o_intra)
 
         kv_f16 = kv.to(tl.float16)
-        qkv_inter = tl.dot(q, kv_f16).to(tl.float16)
-        o_inter = (qkv_inter * q_decay).to(tl.float16)
+        q_with_decay = (q * q_decay).to(tl.float16)
+        o_inter = tl.dot(q_with_decay, kv_f16).to(tl.float16)
 
         # output o_inter debug info
         tl.store(o_inter_output + o_debug_off + tl.arange(0, BLOCK)[:, None] * d + tl.arange(0, d)[None, :], o_inter)
