@@ -102,7 +102,7 @@ def lightning_attn2(q, k, v, s, kernel_impl, BLOCK):
 
     o_padded = torch.empty((b, h, n, e_padded), dtype=q.dtype, device=q.device)
 
-    print(f"[triton] d_padded shape: {d_padded.shape}, e_padded shape: {e_padded.shape}, o_padded shape: {o_padded.shape}")
+    print(f"[triton] d_padded shape: {d_padded}, e_padded shape: {e_padded}, o_padded shape: {o_padded.shape}")
 
     # output debug info
     q_decay_out = torch.empty((b, h, BLOCK), dtype=torch.float16, device=q.device)
