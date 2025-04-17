@@ -110,7 +110,8 @@ def fwd_kernel_v4(
         kv = kv * block_decay + new_kv.to(tl.float32)
 
         # output kv debug info
-        tl.store(kv_output + o_debug_off + tl.arange(0, d)[:, None] * d + tl.arange(0, d)[None, :], kv)
+        kv_debug_off = d * d * bx * NUM_BLOCK + d * d * i
+        tl.store(kv_output + kv_debug_off + tl.arange(0, d)[:, None] * d + tl.arange(0, d)[None, :], kv)
 
         block_off += BLOCK
 
