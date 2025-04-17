@@ -173,16 +173,16 @@ def compute_decay(q, BLOCK):
     block_decay_cute = block_decay.squeeze().to(torch.float32)
     if block_decay_cute.dim() == 0:
         block_decay_cute = block_decay_cute.unsqueeze(0)
-    print(f"block_decay_cute shape: {block_decay_cute.shape}")
-    print(f"H: {H}")
+    # print(f"block_decay_cute shape: {block_decay_cute.shape}")
+    # print(f"H: {H}")
 
     assert q_decay_cute.shape == (H, BLOCK, d)
     assert k_decay_cute.shape == (H, BLOCK, d)
     assert diag_decay_cute.shape == (H, BLOCK, BLOCK)
     assert block_decay_cute.shape == (H,)
 
-    for t in (q_decay_cute, k_decay_cute, diag_decay_cute, block_decay_cute):
-        print(f"min : {torch.min(t)}， max: {torch.max(t)}")
+    # for t in (q_decay_cute, k_decay_cute, diag_decay_cute, block_decay_cute):
+    #     print(f"min : {torch.min(t)}， max: {torch.max(t)}")
 
     return slope_rate, q_decay, k_decay, diag_decay, block_decay, q_decay_cute, k_decay_cute, diag_decay_cute, block_decay_cute
 
@@ -268,18 +268,35 @@ def run_benchmark(BLOCK):
     seq_length_range = [256, 512, 1024]
     configs = list(itertools.product(batch_size_range, seq_length_range))
 
+    # @triton.testing.perf_report(
+    #     triton.testing.Benchmark(
+    #         x_names=["batch_size", "seq_len"],
+    #         x_vals=[list(_) for _ in configs],
+    #         line_arg="provider",
+    #         # "MiniMax-Text-01",
+    #         line_vals=["torch_native", "cute"],
+    #         line_names=[
+    #             "torch_native",
+    #             "cute",
+    #         ],
+    #         styles=[("blue", "-"), ("green", "-")],
+    #         ylabel="us",
+    #         plot_name="lightning-attention-prefill-performance",
+    #         args={},
+    #     )
+    # )
     @triton.testing.perf_report(
         triton.testing.Benchmark(
             x_names=["batch_size", "seq_len"],
             x_vals=[list(_) for _ in configs],
             line_arg="provider",
-            # "MiniMax-Text-01",
-            line_vals=["torch_native", "cute"],
+            line_vals=["torch_native", "cute", "triton"],
             line_names=[
                 "torch_native",
                 "cute",
+                "triton",
             ],
-            styles=[("blue", "-"), ("green", "-")],
+            styles=[("blue", "-"), ("green", "-"), ("red", "--")],  
             ylabel="us",
             plot_name="lightning-attention-prefill-performance",
             args={},
