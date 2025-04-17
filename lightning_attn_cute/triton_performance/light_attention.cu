@@ -179,11 +179,6 @@ __global__ void flash_forward(const half_t* q, const half_t* k, const half_t* v,
     Tensor tBsKVt = thr_mma.partition_B(sKVt);
     clear(tBsKVt);
 
-    if (thread0()) {
-      	PRINT("head id", head_id);
-        PRINT("mma size", size(mma));
-        PRINT("num_block", num_block);
-    }
 
     // load decay tensors
     Tensor q_decay_r = load_decay_tensor_q<decltype(thr_mma), config>(q_decay, thr_mma, head_id);
@@ -191,11 +186,7 @@ __global__ void flash_forward(const half_t* q, const half_t* k, const half_t* v,
     Tensor diag_decay_r = load_decay_tensor_diag_block<decltype(thr_mma), config>(diag_decay, thr_mma, head_id);
     float block_decay_r = block_decay[head_id];
 
-//    if (thread0()) {
-//      	PRINT_TENSOR("q_decay_r", q_decay_r);
-//        PRINT_TENSOR("kt_decay_r", kt_decay_r);
-//        PRINT_TENSOR("diag_decay_r", diag_decay_r);
-//    }
+
 
 
     for (int i = tx; i < kHeadDim * kHeadDim; i += blockDim.x) {
@@ -406,7 +397,7 @@ torch::Tensor forward_with_decay(torch::Tensor q, torch::Tensor k, torch::Tensor
   int BLOCK = 64;
   int num_block = (N + BLOCK - 1) / BLOCK;
 
-  PRINT("num_block", num_block);
+  // PRINT("num_block", num_block);
 
   auto kv_out = torch::zeros({B, H, num_block, d, d}, torch::TensorOptions().dtype(torch::kFloat32).device(torch::Device(torch::kCUDA, 0)));
   auto kv_t_f16_out = torch::zeros({B, H, num_block, d, d}, torch::TensorOptions().dtype(torch::kFloat16).device(torch::Device(torch::kCUDA, 0)));
@@ -420,8 +411,8 @@ torch::Tensor forward_with_decay(torch::Tensor q, torch::Tensor k, torch::Tensor
   dim3 block = config.kThreadNum;
   dim3 grid(B * H);
   auto kernel = flash_forward<decltype(config)>;
-  PRINT("grid", grid);
-  PRINT("block", block);
+//  PRINT("grid", grid);
+//  PRINT("block", block);
 
   kernel<<<grid, block>>>((cute::half_t*)q.data_ptr(), (cute::half_t*)k.data_ptr(),
                                               (cute::half_t*)v.data_ptr(), (cute::half_t*)out.data_ptr(), B, H, N, (float*)kv_out.data_ptr(),
