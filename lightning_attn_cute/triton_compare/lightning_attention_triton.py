@@ -23,6 +23,13 @@ def fwd_kernel_v4(
         BLOCK: tl.constexpr,
         NUM_BLOCK: tl.constexpr,
         BLOCK_MODEL: tl.constexpr,
+        q_decay_out,
+        k_decay_out,
+        diag_decay_out,
+        block_decay_out,
+        kv_output,
+        o_inter_output,
+        o_intra_output
 ):
     bx = tl.program_id(0)
     by = tl.program_id(1)
@@ -41,6 +48,10 @@ def fwd_kernel_v4(
     s_index = -slope * index  # BLOCK * BLOCK
     s_index = tl.where(index >= 0, s_index, float("-inf"))
     diag_decay = tl.exp(s_index).to(tl.float16)
+
+
+    tl.store(q_decay_out + bx * BLOCK,  q_decay[None, :])
+
 
     kv = tl.zeros((d, BLOCK_MODEL), dtype=tl.float32)
 
@@ -75,7 +86,7 @@ def fwd_kernel_v4(
 
         block_off += BLOCK
 
-def lightning_attn2(q, k, v, s, kernel_impl, BLOCK):
+def lightning_attn2(q, k, v, s, BLOCK):
     q = q.contiguous()
     k = k.contiguous()
     v = v.contiguous()
@@ -105,11 +116,10 @@ def lightning_attn2(q, k, v, s, kernel_impl, BLOCK):
     print(f"[triton] d_padded shape: {d_padded}, e_padded shape: {e_padded}, o_padded shape: {o_padded.shape}")
 
 
-
     NUM_BLOCK = triton.cdiv(q.shape[2], BLOCK)
     # parallel over channel
     # BLOCK_MODEL = min(triton.next_power_of_2(e_padded), 32)
-    BLOCK_MODEL = e_padded 
+    BLOCK_MODEL = e_padded
 
 
     # output debug info
@@ -119,12 +129,13 @@ def lightning_attn2(q, k, v, s, kernel_impl, BLOCK):
     block_decay_out = torch.empty((b, h, 1), dtype=torch.float32, device=q.device)
     kv_output = torch.empty((b, h, NUM_BLOCK, d, d), dtype=torch.float32, device=q.device)
     o_inter_output = torch.empty((b, h, NUM_BLOCK, BLOCK, d), dtype=torch.float32, device=q.device)
+    o_intra_output = torch.empty((b, h, NUM_BLOCK, BLOCK, d), dtype=torch.float32, device=q.device)
 
     grid = (b * h, triton.cdiv(e_padded, BLOCK_MODEL))
 
     # print(f"kernel_impl={kernel_impl}, grid: {grid}")
 
-    kernel_impl[grid](
+    fwd_kernel_v4[grid](
         q_padded,
         k_padded,
         v_padded,
@@ -135,9 +146,16 @@ def lightning_attn2(q, k, v, s, kernel_impl, BLOCK):
         n,
         d_padded,
         e_padded,
-        BLOCK=BLOCK,
-        NUM_BLOCK=NUM_BLOCK,
-        BLOCK_MODEL=BLOCK_MODEL,
+        BLOCK,
+        NUM_BLOCK,
+        BLOCK_MODEL,
+        q_decay_out,
+        k_decay_out,
+        diag_decay_out,
+        block_decay_out,
+        kv_output,
+        o_inter_output,
+        o_intra_output
     )
 
     # Remove padding from output
@@ -146,7 +164,7 @@ def lightning_attn2(q, k, v, s, kernel_impl, BLOCK):
     else:
         o = o_padded
 
-    return o
+    return o, q_decay_out, k_decay_out, diag_decay_out, block_decay_out, kv_output.permute(2, 0, 1, 3, 4), o_inter_output.permute(2, 0, 1, 3, 4), o_intra_output.permute(2, 0, 1, 3, 4)
 
 
 def is_support(dim):
@@ -157,7 +175,7 @@ def next_power_of_2(n):
     return 2 ** (int(math.ceil(math.log(n, 2))))
 
 
-def lightning_attn_func(q, k, v, s, kernel_impl, BLOCK):
+def lightning_attn_func(q, k, v, s, BLOCK):
     b, h, n, d = q.shape
     e = v.shape[-1]
     assert d == e
@@ -169,29 +187,33 @@ def lightning_attn_func(q, k, v, s, kernel_impl, BLOCK):
     if need_pad:
         v = F.pad(v, (0, e_pad - e))
 
-    if d > 128:
-        # split over head
-        if d % 64 == 0:
-            m = 64
-        elif d % 32 == 0:
-            m = 32
-        elif d % 16 == 0:
-            m = 16
-        arr = [m * i for i in range(d // m + 1)]
-        if arr[-1] != d:
-            arr.append(d)
-        n = len(arr)
-        o = 0
-        for i in range(n - 1):
-            start = arr[i]
-            end = arr[i + 1]
-            q1 = q[..., start:end]
-            k1 = k[..., start:end]
-            o += lightning_attn2(q1, k1, v, s, kernel_impl, BLOCK)
-    else:
-        o = lightning_attn2(q, k, v, s, kernel_impl, BLOCK)
+    # if d > 128:
+    #     # split over head
+    #     if d % 64 == 0:
+    #         m = 64
+    #     elif d % 32 == 0:
+    #         m = 32
+    #     elif d % 16 == 0:
+    #         m = 16
+    #     arr = [m * i for i in range(d // m + 1)]
+    #     if arr[-1] != d:
+    #         arr.append(d)
+    #     n = len(arr)
+    #     o = 0
+    #     for i in range(n - 1):
+    #         start = arr[i]
+    #         end = arr[i + 1]
+    #         q1 = q[..., start:end]
+    #         k1 = k[..., start:end]
+    #         o += lightning_attn2(q1, k1, v, s, BLOCK)
+    # else:
+    #     o = lightning_attn2(q, k, v, s, BLOCK)
+
+    o, q_decay_out, k_decay_out, diag_decay_out, block_decay_out, kv_output, o_inter_output, o_intra_output = lightning_attn2(q, k, v, s, BLOCK)
 
     if need_pad:
         o = o[:, :, :, :e]
 
-    return o
+    print(f"[triton] q_decay_out: {q_decay_out}")
+
+    return o, q_decay_out, k_decay_out, diag_decay_out, block_decay_out, kv_output, o_inter_output, o_intra_output
