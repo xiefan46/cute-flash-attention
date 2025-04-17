@@ -290,7 +290,7 @@ def test_forward_with_decay(q, k, v, myflash):
     print(f"torch diag_decay shape: {diag_decay.shape}")
     print(f"torch block_decay shape: {block_decay.shape}")
 
-    print(f"triton_q_decay_out shape: {triton_q_decay_out.shape}, triton_k_decay_out: {triton_k_decay_out.shape}, triton_diag_decay_out shape: {triton_diag_decay_out.shape}, triton_block_decay_out shape: {triton_block_decay_out.shape}")
+    print(f"triton_q_decay_out shape: {triton_q_decay_out[0].shape}, triton_k_decay_out: {triton_k_decay_out[0].shape}, triton_diag_decay_out shape: {triton_diag_decay_out[0].shape}, triton_block_decay_out shape: {triton_block_decay_out[0].shape}")
 
     # torch.testing.assert_allclose(q_decay.reshape(BLOCK, ), triton_q_decay_out[0, 0])
     # torch.testing.assert_allclose(k_decay.reshape(BLOCK, ), triton_k_decay_out[0, 0])
