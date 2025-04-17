@@ -262,7 +262,7 @@ def test_forward_with_decay(q, k, v, myflash):
         assert_close(b_torch_output, b_cute_output)
     # assert_close(torch_output, cute_output)
 
-    print("✅ Two implementations match all tensor")
+    print("✅ Torch and cute two implementations match all tensor")
 
 
     # Step2: compare accuracy between triton and torch
