@@ -193,8 +193,8 @@ def test_forward_with_decay(q, k, v, myflash):
     cute_output, cute_kv_output, cute_o_inter_out, cute_o_intra_out, cute_q_decay_out, cute_kv_t_out = myflash.forward_with_decay(q, k, v, q_decay_cute, k_decay_cute, diag_decay_cute, block_decay_cute)
 
     for i in range(num_block):
-        print(f"torch_kv_output shape: {torch_kv_output[i].shape}")
-        print(f"cute_kv_output shape: {cute_kv_output[i].shape}")
+        # print(f"torch_kv_output shape: {torch_kv_output[i].shape}")
+        # print(f"cute_kv_output shape: {cute_kv_output[i].shape}")
         # torch.testing.assert_close(
         #     torch_kv_output[i],
         #     cute_kv_output[i],
@@ -203,10 +203,10 @@ def test_forward_with_decay(q, k, v, myflash):
     print("✅ kv results match")
 
     for i in range(num_block):
-        print(f"torch_o_intra_out shape: {torch_o_intra_out[i].shape}")
-        print(f"cute_o_intra_out shape: {cute_o_intra_out[i].shape}")
-        print(f"torch_o_intra_out dtype/device: {torch_o_intra_out[i].dtype} device: {torch_o_intra_out[i].device}")
-        print(f"cute_o_intra_out dtype/device: {cute_o_intra_out[i].dtype}, device: {cute_o_intra_out[i].device}")
+        # print(f"torch_o_intra_out shape: {torch_o_intra_out[i].shape}")
+        # print(f"cute_o_intra_out shape: {cute_o_intra_out[i].shape}")
+        # print(f"torch_o_intra_out dtype/device: {torch_o_intra_out[i].dtype} device: {torch_o_intra_out[i].device}")
+        # print(f"cute_o_intra_out dtype/device: {cute_o_intra_out[i].dtype}, device: {cute_o_intra_out[i].device}")
         # torch.testing.assert_close(
         #     torch_o_intra_out[i],
         #     cute_o_intra_out[i],
@@ -215,10 +215,10 @@ def test_forward_with_decay(q, k, v, myflash):
     print("✅ o intra result maches")
 
     for i in range(num_block):
-        print(f"torch_q_decay_out shape: {torch_q_decay_out[i].shape}")
-        print(f"cute_q_decay_out shape: {cute_q_decay_out[i].shape}")
-        print(f"torch_q_decay_out dtype: {torch_q_decay_out[i].dtype}")
-        print(f"cute_q_decay_out dtype: {cute_q_decay_out[i].dtype}")
+        # print(f"torch_q_decay_out shape: {torch_q_decay_out[i].shape}")
+        # print(f"cute_q_decay_out shape: {cute_q_decay_out[i].shape}")
+        # print(f"torch_q_decay_out dtype: {torch_q_decay_out[i].dtype}")
+        # print(f"cute_q_decay_out dtype: {cute_q_decay_out[i].dtype}")
         # torch.testing.assert_close(
         #     torch_q_decay_out[i],
         #     cute_q_decay_out[i],
@@ -227,10 +227,10 @@ def test_forward_with_decay(q, k, v, myflash):
     print("✅ q_decay_out  result matches")
 
     for i in range(num_block):
-        print(f"torch_kv_t_out  shape: {torch_kv_t_out[i].shape}")
-        print(f"cute_kv_t_out shape: {cute_kv_t_out[i].shape}")
-        print(f"torch_kv_t_out dtype: {torch_kv_t_out[i].dtype}")
-        print(f"cute_kv_t_out dtype: {cute_kv_t_out[i].dtype}")
+        # print(f"torch_kv_t_out  shape: {torch_kv_t_out[i].shape}")
+        # print(f"cute_kv_t_out shape: {cute_kv_t_out[i].shape}")
+        # print(f"torch_kv_t_out dtype: {torch_kv_t_out[i].dtype}")
+        # print(f"cute_kv_t_out dtype: {cute_kv_t_out[i].dtype}")
         # torch.testing.assert_close(
         #     torch_kv_t_out[i],
         #     cute_kv_t_out[i],
@@ -239,8 +239,8 @@ def test_forward_with_decay(q, k, v, myflash):
     print("✅ kv_t_out  result matches")
 
     for i in range(num_block):
-        print(f"torch_o_inter_out shape: {torch_o_inter_out[i].shape}")
-        print(f"cute_o_inter_out shape: {cute_o_inter_out[i].shape}")
+        # print(f"torch_o_inter_out shape: {torch_o_inter_out[i].shape}")
+        # print(f"cute_o_inter_out shape: {cute_o_inter_out[i].shape}")
         # torch.testing.assert_close(
         #     torch_o_inter_out[i],
         #     cute_o_inter_out[i],
