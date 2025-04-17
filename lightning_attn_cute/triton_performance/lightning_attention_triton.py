@@ -52,14 +52,14 @@ def fwd_kernel_v4(
 
     for i in range(NUM_BLOCK):
         q_off = block_off[:, None] * d
-        q = tl.load(Q_start + q_off, mask=block_off[:, None] < n, other=0.0).to(tl.float16)
+        q = tl.load(Q_start + q_off, mask=block_off[:, None] < n, other=0.0)
 
         k_off = block_off[None, :] * d
-        k_t = tl.load(K_start + k_off, mask=block_off[None, :] < n, other=0.0).to(tl.float16)
+        k_t = tl.load(K_start + k_off, mask=block_off[None, :] < n, other=0.0)
 
         vo_off = block_off[:, None] * e
-        v = tl.load(V_start + vo_off, mask=block_off[:, None] < n, other=0.0).to(tl.float16)
-        qk = tl.dot(q, k_t).to(tl.float16)
+        v = tl.load(V_start + vo_off, mask=block_off[:, None] < n, other=0.0)
+        qk = tl.dot(q, k_t)
         o_intra = tl.dot((qk * diag_decay).to(tl.float16), v).to(tl.float16)
 
 
