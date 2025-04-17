@@ -242,6 +242,8 @@ def lightning_attn_func(q, k, v, s, BLOCK):
     if need_pad:
         o = o[:, :, :, :e]
 
-    print(f"[triton] q_decay_out: {q_decay_out}, k_decay_out: {k_decay_out}, diag_decay_out: {diag_decay_out}, block_decay_out: {block_decay_out}, o_inter_output: {o_inter_output}, o_intra_output: {o_intra_output}, kv_output: {kv_output}")
+    # print(f"[triton] q_decay_out: {q_decay_out}, k_decay_out: {k_decay_out}, diag_decay_out: {diag_decay_out}, block_decay_out: {block_decay_out}, o_inter_output: {o_inter_output}, o_intra_output: {o_intra_output}, kv_output: {kv_output}")
+
+    print(f"[triton] kv_output shape: {kv_output.shape}")
 
     return o, q_decay_out, k_decay_out, diag_decay_out, block_decay_out, kv_output, o_inter_output, o_intra_output
