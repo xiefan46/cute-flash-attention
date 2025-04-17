@@ -269,7 +269,7 @@ def test_forward_with_decay(q, k, v, myflash):
     triton_output, triton_q_decay_out, triton_k_decay_out, triton_diag_decay_out, triton_block_decay_out, triton_kv_output, triton_o_inter_output, triton_o_intra_output = lightning_attn_func(q, k, v, slope_rate, BLOCK)
 
     for i in range(num_block):
-        print(f"torch_kv_output[i]: {torch_kv_output[i]}")
+        print(f"triton_kv_output[i]: {triton_kv_output[i]}")
         assert_close(torch_kv_output[i], triton_kv_output[i])
     print("✅ kv results match")
 
