@@ -71,17 +71,8 @@ def set_seed(seed=42):
 
 def torch_lightning_attn(q, k, v, q_decay, k_decay, diag_decay, block_decay, BLOCK):
 
-    assert q.dtype == torch.float16
-    assert k.dtype == torch.float16
-    assert v.dtype == torch.float16
-    assert q_decay.dtype == torch.float16
-    assert k_decay.dtype == torch.float16
-    assert diag_decay.dtype == torch.float16
-    assert block_decay.dtype == torch.float32
-
     B, H, N, d = q.shape
 
-    assert N % BLOCK == 0
     NUM_BLOCK = (N + BLOCK - 1) // BLOCK
 
 
@@ -202,7 +193,7 @@ def get_random_qkv(B, H, N, d):
 
 def run_benchmark(BLOCK):
     batch_size_range = [2 ** i for i in range(0, 6)]
-    seq_length_range = [256, 512, 1024]
+    seq_length_range = [256, 512, 1024, 2048]
     configs = list(itertools.product(batch_size_range, seq_length_range))
 
     @triton.testing.perf_report(
