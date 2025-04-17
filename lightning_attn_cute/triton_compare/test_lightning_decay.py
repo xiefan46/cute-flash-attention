@@ -267,7 +267,28 @@ def test_forward_with_decay(q, k, v, myflash):
 
     # Step2: compare accuracy between triton and torch
     triton_output, triton_q_decay_out, triton_k_decay_out, triton_diag_decay_out, triton_block_decay_out, triton_kv_output, triton_o_inter_output, triton_o_intra_output = lightning_attn_func(q, k, v, slope_rate, BLOCK)
-    assert_close(torch_output, triton_output)
+
+    for i in range(num_block):
+        assert_close(torch_kv_output[i], triton_kv_output[i])
+    print("✅ kv results match")
+
+    for i in range(num_block):
+        assert_close(torch_o_intra_out[i], triton_o_intra_output[i])
+    print("✅ o intra result maches")
+
+    for i in range(num_block):
+        assert_close(torch_o_inter_out[i], triton_o_inter_output[i])
+    print("✅ o inter result matches")
+
+    for i in range(num_block):
+        b_torch_output = torch_output[:, :, i * BLOCK : (i + 1) * BLOCK]
+        b_triton_output =  triton_output[:, :, i * BLOCK : (i + 1) * BLOCK]
+
+        assert_close(b_torch_output, b_triton_output)
+
+
+    print("✅ Torch and cute two implementations match all tensor")
+
 
 
 if __name__ == "__main__":
