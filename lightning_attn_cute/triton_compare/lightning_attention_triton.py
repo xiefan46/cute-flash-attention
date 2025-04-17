@@ -35,6 +35,7 @@ def fwd_kernel_v4(
     by = tl.program_id(1)
 
     block_off = tl.arange(0, BLOCK)
+    decay_block_off = block_off + 1
     qk_dim_off = tl.arange(0, d)
     vo_dim_off = tl.arange(0, BLOCK_MODEL) + by * BLOCK_MODEL
     k_row_off = tl.arange(0, d)
@@ -42,10 +43,10 @@ def fwd_kernel_v4(
     batch_id = bx // h
     head_off = bx % h
     slope = tl.load(S + head_off).to(tl.float32)
-    q_decay = tl.exp(-slope * block_off[:, None]).to(tl.float16)
-    k_decay = tl.exp(-slope * (BLOCK - block_off[None, :])).to(tl.float16)
+    q_decay = tl.exp(-slope * decay_block_off[:, None]).to(tl.float16)
+    k_decay = tl.exp(-slope * (BLOCK - decay_block_off[None, :])).to(tl.float16)
     block_decay = tl.exp(-slope * BLOCK)
-    index = block_off[:, None] - block_off[None, :]  # 相对位置 BLOCK x BLOCK
+    index = decay_block_off[:, None] - decay_block_off[None, :]  # 相对位置 BLOCK x BLOCK
     s_index = -slope * index  # BLOCK * BLOCK
     s_index = tl.where(index >= 0, s_index, float("-inf"))
     diag_decay = tl.exp(s_index).to(tl.float16)
