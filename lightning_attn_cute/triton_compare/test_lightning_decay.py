@@ -268,6 +268,23 @@ def test_forward_with_decay(q, k, v, myflash):
     # Step2: compare accuracy between triton and torch
     triton_output, triton_q_decay_out, triton_k_decay_out, triton_diag_decay_out, triton_block_decay_out, triton_kv_output, triton_o_inter_output, triton_o_intra_output = lightning_attn_func(q, k, v, slope_rate, BLOCK)
 
+    # q_decay = torch.exp(-slope_rate * array.reshape(-1, 1)).to(torch.float16)
+    # k_decay = torch.exp(-slope_rate * (BLOCK - array.reshape(-1, 1))).to(torch.float16)
+    # index = array[:, None] - array[None, :]
+    # s_index = (
+    #         slope_rate
+    #         * index[
+    #             None,
+    #             None,
+    #         ]
+    # )
+    # s_index = torch.where(index >= 0, -s_index, float("-inf"))
+    # diag_decay = torch.exp(s_index).to(torch.float16)
+    # block_decay = torch.exp(-slope_rate * BLOCK).to(torch.float32)
+
+    print(f"torch q_decay shape: {q_decay.reshape(1, ).shape}")
+
+
     for i in range(num_block):
         print(f"triton_kv_output[i]: {triton_kv_output[i]}")
         print(f"torch_kv_output[i]: {torch_kv_output[i]}")
