@@ -283,6 +283,8 @@ def test_forward_with_decay(q, k, v, myflash):
     # block_decay = torch.exp(-slope_rate * BLOCK).to(torch.float32)
 
 
+    print(f"torch original q_decay: {q_decay}")
+
 
 
     print(f"torch q_decay shape: {q_decay.squeeze().shape}")
