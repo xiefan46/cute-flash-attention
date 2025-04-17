@@ -49,8 +49,8 @@ def fwd_kernel_v4(
     s_index = tl.where(index >= 0, s_index, float("-inf"))
     diag_decay = tl.exp(s_index).to(tl.float16)
 
-
-    tl.store(q_decay_out + bx * BLOCK,  q_decay[None, :])
+    q_decay_off = bx * BLOCK + tl.arange(0, BLOCK)
+    tl.store(q_decay_out + q_decay_off,  q_decay[None, :])
 
 
     kv = tl.zeros((d, BLOCK_MODEL), dtype=tl.float32)

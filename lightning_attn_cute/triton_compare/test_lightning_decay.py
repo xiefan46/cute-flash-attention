@@ -266,7 +266,7 @@ def test_forward_with_decay(q, k, v, myflash):
 
 
     # Step2: compare accuracy between triton and torch
-    triton_o, triton_q_decay_out, triton_k_decay_out, triton_diag_decay_out, triton_block_decay_out, triton_kv_output, triton_o_inter_output, triton_o_intra_output = lightning_attn_func(q, k, v, slope_rate, BLOCK)
+    triton_output, triton_q_decay_out, triton_k_decay_out, triton_diag_decay_out, triton_block_decay_out, triton_kv_output, triton_o_inter_output, triton_o_intra_output = lightning_attn_func(q, k, v, slope_rate, BLOCK)
     assert_close(torch_output, triton_output)
 
 
