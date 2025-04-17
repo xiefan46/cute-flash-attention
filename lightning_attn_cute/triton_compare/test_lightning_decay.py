@@ -310,7 +310,7 @@ if __name__ == "__main__":
     H = 1
     N = 2048
     # NOTE: we only support d = 64!
-    d = 96
+    d = 64
 
 
     q = torch.randn(B, N, H, d).cuda().half()
