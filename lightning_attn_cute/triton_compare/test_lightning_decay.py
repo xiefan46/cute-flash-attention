@@ -186,8 +186,8 @@ def test_forward_with_decay(q, k, v, myflash):
     # print(f"cute decay. q_decay_cute: {q_decay_cute}, k_decay_cute: {k_decay_cute}, diag_decay_cute: {diag_decay_cute}, block_decay_cute: {block_decay_cute}")
 
 
-    for t in (q_decay_cute, k_decay_cute, diag_decay_cute, block_decay_cute):
-        print(f"min : {torch.min(t)}， max: {torch.max(t)}")
+    # for t in (q_decay_cute, k_decay_cute, diag_decay_cute, block_decay_cute):
+    #     print(f"min : {torch.min(t)}， max: {torch.max(t)}")
 
     # cute_output, cute_kv_output, cute_o_inter_out, cute_o_intra_out, cute_q_decay_out, cute_kv_t_out = myflash.forward_with_decay(q, k, v, q_decay_cute, k_decay_cute, diag_decay_cute, block_decay_cute)
     #
