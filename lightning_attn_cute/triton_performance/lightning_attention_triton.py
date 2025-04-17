@@ -21,14 +21,7 @@ def fwd_kernel_v4(
         e: tl.constexpr,
         BLOCK: tl.constexpr,
         NUM_BLOCK: tl.constexpr,
-        BLOCK_MODEL: tl.constexpr,
-        q_decay_out,
-        k_decay_out,
-        diag_decay_out,
-        block_decay_out,
-        kv_output,
-        o_inter_output,
-        o_intra_output
+        BLOCK_MODEL: tl.constexpr
 ):
     bx = tl.program_id(0)
     by = tl.program_id(1)
@@ -50,24 +43,6 @@ def fwd_kernel_v4(
     s_index = tl.where(index >= 0, s_index, float("-inf"))
     diag_decay = tl.exp(s_index).to(tl.float16)
 
-    # q_decay_off_debug = tl.arange(0, BLOCK)
-    # tl.static_print("q_decay_off_debug")
-    # tl.static_print(q_decay_off_debug[None, :])
-    # tl.static_print(q_decay_off_debug)
-
-    # output decay debug info
-    qk_decay_off = bx * BLOCK + tl.arange(0, BLOCK)
-    tl.store(q_decay_out + qk_decay_off,  tl.reshape(q_decay, (BLOCK,)))
-    tl.store(k_decay_out + qk_decay_off,  tl.reshape(k_decay, (BLOCK,)))
-
-    block_decay_off = batch_id * h + head_off
-    tl.store(block_decay_out + block_decay_off, block_decay)
-
-    diag_decay_off = diag_decay_out + bx * BLOCK * BLOCK + block_off[:, None] * BLOCK + block_off[None, :]
-    tl.store(diag_decay_off, diag_decay)
-
-
-
     kv = tl.zeros((d, BLOCK_MODEL), dtype=tl.float32)
 
     Q_start = Q + bx * n * d + qk_dim_off[None, :]
@@ -84,23 +59,14 @@ def fwd_kernel_v4(
 
         vo_off = block_off[:, None] * e
         v = tl.load(V_start + vo_off, mask=block_off[:, None] < n, other=0.0).to(tl.float16)
-
-
         qk = tl.dot(q, k_t).to(tl.float16)
-
-        o_debug_off = BLOCK * d * bx * NUM_BLOCK + BLOCK * d * i
-
         o_intra = tl.dot((qk * diag_decay).to(tl.float16), v).to(tl.float16)
 
-        # output o_intra debug info
-        tl.store(o_intra_output + o_debug_off + tl.arange(0, BLOCK)[:, None] * d + tl.arange(0, d)[None, :], o_intra)
 
         kv_f16 = kv.to(tl.float16)
         q_with_decay = (q * q_decay).to(tl.float16)
         o_inter = tl.dot(q_with_decay, kv_f16).to(tl.float16)
 
-        # output o_inter debug info
-        tl.store(o_inter_output + o_debug_off + tl.arange(0, BLOCK)[:, None] * d + tl.arange(0, d)[None, :], o_inter)
 
         o = o_intra + o_inter
 
@@ -108,11 +74,6 @@ def fwd_kernel_v4(
 
         new_kv = tl.dot(k_t * k_decay, v).to(tl.float16)
         kv = kv * block_decay + new_kv.to(tl.float32)
-
-        # output kv debug info
-        kv_debug_off = d * d * bx * NUM_BLOCK + d * d * i
-        tl.store(kv_output + kv_debug_off + tl.arange(0, d)[:, None] * d + tl.arange(0, d)[None, :], kv)
-
         block_off += BLOCK
 
 def lightning_attn2(q, k, v, s, BLOCK):
@@ -151,14 +112,6 @@ def lightning_attn2(q, k, v, s, BLOCK):
     BLOCK_MODEL = e_padded
 
 
-    # output debug info
-    q_decay_out = torch.empty((b, h, BLOCK), dtype=torch.float16, device=q.device)
-    k_decay_out = torch.empty((b, h, BLOCK), dtype=torch.float16, device=q.device)
-    diag_decay_out = torch.empty((b, h, BLOCK, BLOCK), dtype=torch.float16, device=q.device)
-    block_decay_out = torch.empty((b, h), dtype=torch.float32, device=q.device)
-    kv_output = torch.empty((b, h, NUM_BLOCK, d, d), dtype=torch.float32, device=q.device)
-    o_inter_output = torch.empty((b, h, NUM_BLOCK, BLOCK, d), dtype=torch.float16, device=q.device)
-    o_intra_output = torch.empty((b, h, NUM_BLOCK, BLOCK, d), dtype=torch.float16, device=q.device)
 
     grid = (b * h, triton.cdiv(e_padded, BLOCK_MODEL))
 
@@ -178,13 +131,6 @@ def lightning_attn2(q, k, v, s, BLOCK):
         BLOCK,
         NUM_BLOCK,
         BLOCK_MODEL,
-        q_decay_out,
-        k_decay_out,
-        diag_decay_out,
-        block_decay_out,
-        kv_output,
-        o_inter_output,
-        o_intra_output
     )
 
     # Remove padding from output
@@ -193,7 +139,7 @@ def lightning_attn2(q, k, v, s, BLOCK):
     else:
         o = o_padded
 
-    return o, q_decay_out, k_decay_out, diag_decay_out, block_decay_out, kv_output.permute(2, 0, 1, 3, 4), o_inter_output.permute(2, 0, 1, 3, 4), o_intra_output.permute(2, 0, 1, 3, 4)
+    return o
 
 
 def is_support(dim):
@@ -238,7 +184,7 @@ def lightning_attn_triton(q, k, v, s, BLOCK):
     # else:
     #     o = lightning_attn2(q, k, v, s, BLOCK)
 
-    o, q_decay_out, k_decay_out, diag_decay_out, block_decay_out, kv_output, o_inter_output, o_intra_output = lightning_attn2(q, k, v, s, BLOCK)
+    o = lightning_attn2(q, k, v, s, BLOCK)
 
     if need_pad:
         o = o[:, :, :, :e]
