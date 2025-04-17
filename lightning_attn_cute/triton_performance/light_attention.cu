@@ -157,11 +157,6 @@ __global__ void flash_forward(const half_t* q, const half_t* k, const half_t* v,
     const int num_block = (N + BLOCK - 1) / BLOCK;
 
     __shared__ float smem_kv[kHeadDim * kHeadDim];
-    //  for (int i = tx; i < kHeadDim * kHeadDim; i += blockDim.x) {
-    //    smem_kv[i] = __float2half(0.0f);
-    //  }
-    //  __syncthreads();
-
     Tensor Q = make_tensor(make_gmem_ptr<half_t>(q + bs_head_offset), make_shape(N, Int<kHeadDim>{}), make_stride(Int<kHeadDim>{}, Int<1>{})); // N x d
     Tensor K = make_tensor(make_gmem_ptr<half_t>(k + bs_head_offset), make_shape(N, Int<kHeadDim>{}), make_stride(Int<kHeadDim>{}, Int<1>{})); // N x d
     Tensor Kt = make_tensor(make_gmem_ptr<half_t>(k + bs_head_offset), make_shape(Int<kHeadDim>{}, N), make_stride(Int<1>{}, Int<kHeadDim>{})); // d x N
@@ -185,9 +180,6 @@ __global__ void flash_forward(const half_t* q, const half_t* k, const half_t* v,
     Tensor kt_decay_r = load_decay_tensor_kt<decltype(thr_mma), config>(k_decay, thr_mma, head_id);
     Tensor diag_decay_r = load_decay_tensor_diag_block<decltype(thr_mma), config>(diag_decay, thr_mma, head_id);
     float block_decay_r = block_decay[head_id];
-
-
-
 
     for (int i = tx; i < kHeadDim * kHeadDim; i += blockDim.x) {
         smem_kv[i] = 0.0f; // 正确初始化为float类型
@@ -221,14 +213,6 @@ __global__ void flash_forward(const half_t* q, const half_t* k, const half_t* v,
 
         Tensor tCrS_fp16_decay = make_tensor_like(tCrS_fp16);
         clear(tCrS_fp16_decay);
-        assert(diag_decay_r.layout() == tCrS_fp16.layout());
-        assert(diag_decay_r.layout() == tCrS_fp16_decay.layout());
-
-
-//        if (thread0()) {
-//          PRINT_TENSOR("tCrS_fp16_decay", tCrS_fp16_decay);
-//        }
-		// cute::transform(diag_decay_r, tCrS_fp16, tCrS_fp16_decay, multiply_op);
 
         for (int si = 0; si < size(tCrS_fp16_decay); si++) {
             tCrS_fp16_decay(si) = diag_decay_r(si) * tCrS_fp16(si);
@@ -343,10 +327,6 @@ __global__ void flash_forward(const half_t* q, const half_t* k, const half_t* v,
         Tensor tArKt_decay = make_tensor_like(tArKt);
 
         clear(tArKt_decay);
-
-        assert(kt_decay_r.layout() == tArKt.layout());
-        assert(kt_decay_r.layout() == tArKt_decay.layout());
-
 
         for (int si = 0; si < size(tArKt_decay); si++) {
             tArKt_decay(si) = kt_decay_r(si) * tArKt(si);
