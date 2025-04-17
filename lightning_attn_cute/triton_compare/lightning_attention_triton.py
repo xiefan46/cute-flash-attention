@@ -53,8 +53,8 @@ def fwd_kernel_v4(
     tl.static_print("q_decay_off_debug")
     tl.static_print(q_decay_off_debug[None, :])
 
-    q_decay_off = q_decay_out + bx * BLOCK + tl.arange(0, BLOCK)
-    tl.store(q_decay_off[None, :],  q_decay[None, :])
+    # q_decay_off = q_decay_out + bx * BLOCK + tl.arange(0, BLOCK)
+    # tl.store(q_decay_off[None, :],  q_decay[None, :])
 
 
     kv = tl.zeros((d, BLOCK_MODEL), dtype=tl.float32)
