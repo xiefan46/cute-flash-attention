@@ -146,6 +146,7 @@ def assert_close(actual, expected, atol=1e-5, rtol=1e-3, max_mismatch_ratio=0.00
 
 
 def compute_decay(q, BLOCK):
+    B, H, N, d = q.shape
     array = torch.arange(BLOCK).to(q) + 1
     slope_rate = _build_slope_tensor(H).to(q.device)
     q_decay = torch.exp(-slope_rate * array.reshape (-1, 1)).to(torch.float16)
