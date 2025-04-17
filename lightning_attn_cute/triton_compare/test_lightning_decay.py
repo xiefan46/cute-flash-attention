@@ -270,6 +270,7 @@ def test_forward_with_decay(q, k, v, myflash):
 
     for i in range(num_block):
         print(f"triton_kv_output[i]: {triton_kv_output[i]}")
+        print(f"torch_kv_output[i]: {torch_kv_output[i]}")
         assert_close(torch_kv_output[i], triton_kv_output[i])
     print("✅ kv results match")
 
