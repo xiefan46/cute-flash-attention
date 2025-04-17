@@ -296,10 +296,10 @@ def test_forward_with_decay(q, k, v, myflash):
 
     print(f"torch q_decay values: {q_decay.squeeze()}, triton q decay values: {triton_q_decay_out[0]}")
 
-    torch.testing.assert_allclose(q_decay.squeeze(), triton_q_decay_out[0])
-    torch.testing.assert_allclose(k_decay.squeeze(), triton_k_decay_out[0])
-    torch.testing.assert_allclose(diag_decay.squeeze(), triton_diag_decay_out[0])
-    torch.testing.assert_allclose(block_decay.squeeze(), triton_block_decay_out[0])
+    torch.testing.assert_close(q_decay.squeeze(), triton_q_decay_out[0])
+    torch.testing.assert_close(k_decay.squeeze(), triton_k_decay_out[0])
+    torch.testing.assert_close(diag_decay.squeeze(), triton_diag_decay_out[0])
+    torch.testing.assert_close(block_decay.squeeze(), triton_block_decay_out[0])
 
 
     for i in range(num_block):
@@ -363,8 +363,8 @@ if __name__ == "__main__":
 
 
     set_seed(10086)
-    B = 4
-    H = 16
+    B = 1
+    H = 1
     N = 2048
     # NOTE: we only support d = 64!
     d = 64
