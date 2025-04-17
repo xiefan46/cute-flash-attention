@@ -5,7 +5,6 @@ import math
 import torch
 import torch.nn.functional as F
 import triton
-import triton
 import triton.language as tl
 
 @triton.jit
@@ -205,7 +204,7 @@ def next_power_of_2(n):
     return 2 ** (int(math.ceil(math.log(n, 2))))
 
 
-def lightning_attn_func(q, k, v, s, BLOCK):
+def lightning_attn_triton(q, k, v, s, BLOCK):
     b, h, n, d = q.shape
     e = v.shape[-1]
     assert d == e

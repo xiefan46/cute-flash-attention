@@ -7,8 +7,10 @@ import random
 import numpy as np
 from torch.cuda.amp import autocast, GradScaler
 import math
+import itertools
+import triton
 
-from lightning_attention_triton import lightning_attn_func, fwd_kernel_v4
+from lightning_attention_triton import lightning_attn_triton, fwd_kernel_v4
 
 
 # from flashinfer import single_prefill_with_kv_cache
@@ -142,15 +144,11 @@ def assert_close(actual, expected, atol=1e-5, rtol=1e-3, max_mismatch_ratio=0.00
             f"Max relative difference: {max_rel_diff}"
         )
 
-def veryfy_correct_result(q, k, v, myflash):
 
-    # Step1: compare accuracy between cute and torch
-    B, H, N, d = q.shape
-    BLOCK = 64
-    num_block = (N + BLOCK - 1) // BLOCK
+def compute_decay(q, BLOCK):
     array = torch.arange(BLOCK).to(q) + 1
     slope_rate = _build_slope_tensor(H).to(q.device)
-    q_decay = torch.exp(-slope_rate * array.reshape(-1, 1)).to(torch.float16)
+    q_decay = torch.exp(-slope_rate * array.reshape (-1, 1)).to(torch.float16)
     k_decay = torch.exp(-slope_rate * (BLOCK - array.reshape(-1, 1))).to(torch.float16)
     index = array[:, None] - array[None, :]
     s_index = (
@@ -164,11 +162,12 @@ def veryfy_correct_result(q, k, v, myflash):
     diag_decay = torch.exp(s_index).to(torch.float16)
     block_decay = torch.exp(-slope_rate * BLOCK).to(torch.float32)
 
-    torch_output, torch_kv_output, torch_o_inter_out, torch_o_intra_out, torch_q_decay_out, torch_kv_t_out = torch_lightning_attn(q, k, v, q_decay, k_decay, diag_decay, block_decay, BLOCK)
 
     q_decay_cute = q_decay.expand(-1, -1, d).to(torch.float16).contiguous()
     k_decay_cute = k_decay.expand(-1, -1, d).to(torch.float16).contiguous()
     diag_decay_cute = diag_decay.squeeze(dim=0).to(torch.float16).contiguous()
+
+
 
     block_decay_cute = block_decay.squeeze().to(torch.float32)
     if block_decay_cute.dim() == 0:
@@ -181,69 +180,37 @@ def veryfy_correct_result(q, k, v, myflash):
     assert diag_decay_cute.shape == (H, BLOCK, BLOCK)
     assert block_decay_cute.shape == (H,)
 
-
-    # print(f"cute decay. q_decay_cute shape: {q_decay_cute.shape}, k_decay_cute shape: {k_decay_cute.shape}, diag_decay_cute shape: {diag_decay_cute.shape}, block_decay_cute shape: {block_decay_cute.shape}")
-    # print(f"cute decay. q_decay_cute: {q_decay_cute}, k_decay_cute: {k_decay_cute}, diag_decay_cute: {diag_decay_cute}, block_decay_cute: {block_decay_cute}")
-
-
     for t in (q_decay_cute, k_decay_cute, diag_decay_cute, block_decay_cute):
         print(f"min : {torch.min(t)}， max: {torch.max(t)}")
 
+    return slope_rate, q_decay, k_decay, diag_decay, block_decay, q_decay_cute, k_decay_cute, diag_decay_cute, block_decay_cute
+
+def veryfy_correct_result(q, k, v, myflash, BLOCK):
+
+    # Step1: compare accuracy between cute and torch
+    B, H, N, d = q.shape
+    num_block = (N + BLOCK - 1) // BLOCK
+    slope_rate, q_decay, k_decay, diag_decay, block_decay, q_decay_cute, k_decay_cute, diag_decay_cute, block_decay_cute = compute_decay(q, BLOCK)
+    torch_output, torch_kv_output, torch_o_inter_out, torch_o_intra_out, torch_q_decay_out, torch_kv_t_out = torch_lightning_attn(q, k, v, q_decay, k_decay, diag_decay, block_decay, BLOCK)
     cute_output, cute_kv_output, cute_o_inter_out, cute_o_intra_out, cute_q_decay_out, cute_kv_t_out = myflash.forward_with_decay(q, k, v, q_decay_cute, k_decay_cute, diag_decay_cute, block_decay_cute)
 
     for i in range(num_block):
-        # print(f"torch_kv_output shape: {torch_kv_output[i].shape}")
-        # print(f"cute_kv_output shape: {cute_kv_output[i].shape}")
-        # torch.testing.assert_close(
-        #     torch_kv_output[i],
-        #     cute_kv_output[i],
-        # )
         assert_close(torch_kv_output[i], cute_kv_output[i])
     print("✅ kv results match")
 
     for i in range(num_block):
-        # print(f"torch_o_intra_out shape: {torch_o_intra_out[i].shape}")
-        # print(f"cute_o_intra_out shape: {cute_o_intra_out[i].shape}")
-        # print(f"torch_o_intra_out dtype/device: {torch_o_intra_out[i].dtype} device: {torch_o_intra_out[i].device}")
-        # print(f"cute_o_intra_out dtype/device: {cute_o_intra_out[i].dtype}, device: {cute_o_intra_out[i].device}")
-        # torch.testing.assert_close(
-        #     torch_o_intra_out[i],
-        #     cute_o_intra_out[i],
-        # )
         assert_close(torch_o_intra_out[i], cute_o_intra_out[i])
     print("✅ o intra result maches")
 
     for i in range(num_block):
-        # print(f"torch_q_decay_out shape: {torch_q_decay_out[i].shape}")
-        # print(f"cute_q_decay_out shape: {cute_q_decay_out[i].shape}")
-        # print(f"torch_q_decay_out dtype: {torch_q_decay_out[i].dtype}")
-        # print(f"cute_q_decay_out dtype: {cute_q_decay_out[i].dtype}")
-        # torch.testing.assert_close(
-        #     torch_q_decay_out[i],
-        #     cute_q_decay_out[i],
-        # )
         assert_close(torch_q_decay_out[i], cute_q_decay_out[i])
     print("✅ q_decay_out  result matches")
 
     for i in range(num_block):
-        # print(f"torch_kv_t_out  shape: {torch_kv_t_out[i].shape}")
-        # print(f"cute_kv_t_out shape: {cute_kv_t_out[i].shape}")
-        # print(f"torch_kv_t_out dtype: {torch_kv_t_out[i].dtype}")
-        # print(f"cute_kv_t_out dtype: {cute_kv_t_out[i].dtype}")
-        # torch.testing.assert_close(
-        #     torch_kv_t_out[i],
-        #     cute_kv_t_out[i],
-        # )
         assert_close(torch_kv_t_out[i], cute_kv_t_out[i])
     print("✅ kv_t_out  result matches")
 
     for i in range(num_block):
-        # print(f"torch_o_inter_out shape: {torch_o_inter_out[i].shape}")
-        # print(f"cute_o_inter_out shape: {cute_o_inter_out[i].shape}")
-        # torch.testing.assert_close(
-        #     torch_o_inter_out[i],
-        #     cute_o_inter_out[i],
-        # )
         assert_close(torch_o_inter_out[i], cute_o_inter_out[i])
     print("✅ o inter result matches")
 
@@ -251,51 +218,12 @@ def veryfy_correct_result(q, k, v, myflash):
     for i in range(num_block):
         b_torch_output = torch_output[:, :, i * BLOCK : (i + 1) * BLOCK]
         b_cute_output =  cute_output[:, :, i * BLOCK : (i + 1) * BLOCK]
-
-        # print(f"block: {i}, b_torch_output shape: {b_torch_output.shape}. value: {b_torch_output}")
-        # print(f"block: {i}, b_cute_output shape: {b_cute_output.shape}. value: {b_cute_output}")
-
-        # torch.testing.assert_close(
-        #     b_torch_output,
-        #     b_cute_output,
-        # )
         assert_close(b_torch_output, b_cute_output)
-    # assert_close(torch_output, cute_output)
-
     print("✅ Torch and cute two implementations match all tensor")
 
 
     # Step2: compare accuracy between triton and torch
-    triton_output, triton_q_decay_out, triton_k_decay_out, triton_diag_decay_out, triton_block_decay_out, triton_kv_output, triton_o_inter_output, triton_o_intra_output = lightning_attn_func(q, k, v, slope_rate, BLOCK)
-
-    # q_decay = torch.exp(-slope_rate * array.reshape(-1, 1)).to(torch.float16)
-    # k_decay = torch.exp(-slope_rate * (BLOCK - array.reshape(-1, 1))).to(torch.float16)
-    # index = array[:, None] - array[None, :]
-    # s_index = (
-    #         slope_rate
-    #         * index[
-    #             None,
-    #             None,
-    #         ]
-    # )
-    # s_index = torch.where(index >= 0, -s_index, float("-inf"))
-    # diag_decay = torch.exp(s_index).to(torch.float16)
-    # block_decay = torch.exp(-slope_rate * BLOCK).to(torch.float32)
-
-
-    # print(f"torch original q_decay: {q_decay}")
-
-
-
-    # print(f"torch q_decay shape: {q_decay.squeeze().shape}")
-    # print(f"torch k_decay shape: {k_decay.squeeze().shape}")
-    # print(f"torch diag_decay shape: {diag_decay.squeeze().shape}")
-    # print(f"torch block_decay shape: {block_decay.squeeze().shape}")
-
-    # print(f"triton_q_decay_out shape: {triton_q_decay_out[0].shape}, triton_k_decay_out: {triton_k_decay_out[0].shape}, triton_diag_decay_out shape: {triton_diag_decay_out[0].shape}, triton_block_decay_out shape: {triton_block_decay_out[0].shape}")
-
-    # print(f"torch q_decay values: {q_decay.squeeze()[0]}, triton q decay values: {triton_q_decay_out[0, 0]}")
-
+    triton_output, triton_q_decay_out, triton_k_decay_out, triton_diag_decay_out, triton_block_decay_out, triton_kv_output, triton_o_inter_output, triton_o_intra_output = lightning_attn_triton(q, k, v, slope_rate, BLOCK)
     torch.testing.assert_close(q_decay.squeeze(), triton_q_decay_out[0])
     torch.testing.assert_close(k_decay.squeeze(), triton_k_decay_out[0])
     torch.testing.assert_close(diag_decay.squeeze(), triton_diag_decay_out[0])
@@ -304,8 +232,6 @@ def veryfy_correct_result(q, k, v, myflash):
     print("✅ all decay match")
 
     for i in range(num_block):
-        # print(f"triton_kv_output[i]: {triton_kv_output[i]}")
-        # print(f"torch_kv_output[i]: {torch_kv_output[i]}")
         assert_close(torch_kv_output[i], triton_kv_output[i])
     print("✅ kv results match")
 
@@ -314,8 +240,6 @@ def veryfy_correct_result(q, k, v, myflash):
     print("✅ o intra result maches")
 
     for i in range(num_block):
-        # print(f"torch_o_inter_out[i]: {torch_o_inter_out[i]}")
-        # print(f"triton_o_inter_output[i]: {triton_o_inter_output[i]}")
         assert_close(torch_o_inter_out[i], triton_o_inter_output[i])
     print("✅ o inter result matches")
 
@@ -328,6 +252,63 @@ def veryfy_correct_result(q, k, v, myflash):
 
     print("✅ Torch and triton two implementations match all tensor")
 
+# get q, k, v with shape (B, H, N, d)
+def get_random_qkv(B, H, N, d):
+    q = torch.randn(B, N, H, d).cuda().half()
+    k = torch.randn(B, N, H, d).cuda().half()
+    v = torch.randn(B, N, H, d).cuda().half()
+    q1 = q.transpose(1, 2).contiguous()
+    k1 = k.transpose(1, 2).contiguous()
+    v1 = v.transpose(1, 2).contiguous()
+    return q1, k1, v1
+
+def run_benchmark(BLOCK):
+    batch_size_range = [2 ** i for i in range(0, 6)]
+    seq_length_range = [256, 512, 1024]
+    configs = list(itertools.product(batch_size_range, seq_length_range))
+
+    @triton.testing.perf_report(
+        triton.testing.Benchmark(
+            x_names=["batch_size", "seq_len"],
+            x_vals=[list(_) for _ in configs],
+            line_arg="provider",
+            # "MiniMax-Text-01",
+            line_vals=["torch_native", "cute"],
+            line_names=[
+                "torch_native",
+                "cute",
+            ],
+            styles=[("blue", "-"), ("green", "-")],
+            ylabel="us",
+            plot_name="lightning-attention-prefill-performance",
+            args={},
+        )
+    )
+    def benchmark(batch_size, seq_len, provider):
+        dtype = torch.bfloat16
+        device = torch.device("cuda")
+
+        q, k, v = get_random_qkv(B = batch_size, H = 64, N = seq_len, d = 64)
+
+        quantiles = [0.5, 0.2, 0.8]
+        slope_rate, q_decay, k_decay, diag_decay, block_decay, q_decay_cute, k_decay_cute, diag_decay_cute, block_decay_cute = compute_decay(q, BLOCK)
+        def run_lib():
+            if provider == "torch_native":
+                torch_lightning_attn(q, k, v, q_decay, k_decay, diag_decay, block_decay, BLOCK)
+            elif provider == "triton":
+                lightning_attn_triton(q, k, v, slope_rate, BLOCK)
+            elif provider == "cute":
+                myflash.forward_with_decay(q, k, v, q_decay_cute, k_decay_cute, diag_decay_cute, block_decay_cute)
+            else:
+                raise ValueError("Unknown provider")
+
+        ms, min_ms, max_ms = triton.testing.do_bench(
+            lambda: run_lib(),
+            quantiles=quantiles,
+        )
+        return 1000 * ms, 1000 * max_ms, 1000 * min_ms
+
+    benchmark.run(print_data=True)
 
 
 if __name__ == "__main__":
@@ -366,20 +347,13 @@ if __name__ == "__main__":
 
 
     set_seed(10086)
-    B = 16
-    H = 64
-    N = 2048
-    # NOTE: we only support d = 64!
-    d = 64
+    BLOCK = 64
+    # make sure cute and triton implmentations are the same as torch
+    for i in range(1):
+        q, k, v = get_random_qkv(B = 16, H = 64, N = 2048, d = 64)
+        veryfy_correct_result(q, k, v, myflash, BLOCK)
 
-    for i in range(5):
-        q = torch.randn(B, N, H, d).cuda().half()
-        k = torch.randn(B, N, H, d).cuda().half()
-        v = torch.randn(B, N, H, d).cuda().half()
-        q1 = q.transpose(1, 2).contiguous()
-        k1 = k.transpose(1, 2).contiguous()
-        v1 = v.transpose(1, 2).contiguous()
+    # compare performance
+    run_benchmark(BLOCK)
 
-        # make sure cute and triton implmentations are the same as torch
-        veryfy_correct_result(q1, k1, v1, myflash)
 
