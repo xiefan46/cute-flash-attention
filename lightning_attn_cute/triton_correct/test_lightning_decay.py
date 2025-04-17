@@ -296,7 +296,7 @@ def run_benchmark(BLOCK):
                 "cute",
                 "triton",
             ],
-            styles=[("blue", "-"), ("green", "-"), ("red", "--")],  
+            styles=[("blue", "-"), ("green", "-"), ("red", "--")],
             ylabel="us",
             plot_name="lightning-attention-prefill-performance",
             args={},

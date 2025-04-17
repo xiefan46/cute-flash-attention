@@ -142,7 +142,7 @@ def lightning_attn2(q, k, v, s, BLOCK):
 
     o_padded = torch.empty((b, h, n, e_padded), dtype=q.dtype, device=q.device)
 
-    print(f"[triton] d_padded shape: {d_padded}, e_padded shape: {e_padded}, o_padded shape: {o_padded.shape}")
+    # print(f"[triton] d_padded shape: {d_padded}, e_padded shape: {e_padded}, o_padded shape: {o_padded.shape}")
 
 
     NUM_BLOCK = triton.cdiv(q.shape[2], BLOCK)
@@ -162,7 +162,7 @@ def lightning_attn2(q, k, v, s, BLOCK):
 
     grid = (b * h, triton.cdiv(e_padded, BLOCK_MODEL))
 
-    print(f" grid: {grid}")
+    # print(f" grid: {grid}")
 
     fwd_kernel_v4[grid](
         q_padded,
@@ -245,6 +245,6 @@ def lightning_attn_triton(q, k, v, s, BLOCK):
 
     # print(f"[triton] q_decay_out: {q_decay_out}, k_decay_out: {k_decay_out}, diag_decay_out: {diag_decay_out}, block_decay_out: {block_decay_out}, o_inter_output: {o_inter_output}, o_intra_output: {o_intra_output}, kv_output: {kv_output}")
 
-    print(f"[triton] kv_output shape: {kv_output.shape}")
+    # print(f"[triton] kv_output shape: {kv_output.shape}")
 
     return o, q_decay_out, k_decay_out, diag_decay_out, block_decay_out, kv_output, o_inter_output, o_intra_output
