@@ -243,11 +243,6 @@ __global__ void flash_forward(const half_t* q, const half_t* k, const half_t* v,
 //          PRINT_TENSOR("tOrO_intra_f16", tOrO_intra_f16);
 //        }
 
-        // output debug info
-        Tensor O_intra = make_tensor(make_gmem_ptr<half_t>(o_intra_out + block_id * BLOCK * kHeadDim + bx * num_block * BLOCK * kHeadDim),
-                                 make_shape(Int<BLOCK>{}, Int<kHeadDim>{}), make_stride(Int<kHeadDim>{}, Int<1>{})); // d x d
-        Tensor gO_intra = thr_mma.partition_C(O_intra);
-        cute::copy(tOrO_intra_f16, gO_intra);
 //
 //        // Step3: compute o_inter
 //        // 计算 o_inter = q @ kv -> BLOCK x d @ d x d = BLOCK x d
@@ -260,15 +255,6 @@ __global__ void flash_forward(const half_t* q, const half_t* k, const half_t* v,
 
         __syncthreads();
 
-        cute::copy(tBsKVt, tBrKVt);
-
-
-//        if (thread0()) {
-//            PRINT("tBrKVt", tBrKVt);
-//            PRINT("tBgKVt_f16_out", tBgKVt_f16_out);
-//        }
-
-        cute::copy(tBrKVt, tBgKVt_f16_out);
 
 		Tensor tArQ_decay = make_tensor_like(tArQ);
         clear(tArQ_decay);
@@ -364,7 +350,7 @@ torch::Tensor forward_with_decay(torch::Tensor q, torch::Tensor k, torch::Tensor
 
   kernel<<<grid, block>>>((cute::half_t*)q.data_ptr(), (cute::half_t*)k.data_ptr(),
                                               (cute::half_t*)v.data_ptr(), (cute::half_t*)out.data_ptr(), B, H, N,
-                          (cute::half_t*) q_decay,  (cute::half_t*) k_decay,  (cute::half_t*) diag_decay,  (float*) block_decay);
+                          (cute::half_t*) q_decay.data_ptr(),  (cute::half_t*) k_decay.data_ptr(),  (cute::half_t*) diag_decay.data_ptr(),  (float*) block_decay.data_ptr());
 
 
 
