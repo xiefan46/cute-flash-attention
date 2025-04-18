@@ -181,10 +181,8 @@ __global__ void flash_forward(const half_t* q, const half_t* k, const half_t* v,
     Tensor diag_decay_r = load_decay_tensor_diag_block<decltype(thr_mma), config>(diag_decay, thr_mma, head_id);
     float block_decay_r = block_decay[head_id];
 
-
-
     for (int i = tx; i < kHeadDim * kHeadDim; i += blockDim.x) {
-        smem_kv[i] = 0.0f; 
+        smem_kv[i] = 0.0f;
     }
     __syncthreads();
 
