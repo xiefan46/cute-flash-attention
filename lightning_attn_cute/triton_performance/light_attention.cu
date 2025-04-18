@@ -184,7 +184,7 @@ __global__ void flash_forward(const half_t* q, const half_t* k, const half_t* v,
 
 
     for (int i = tx; i < kHeadDim * kHeadDim; i += blockDim.x) {
-        smem_kv[i] = 0.0f; // 正确初始化为float类型
+        smem_kv[i] = 0.0f; 
     }
     __syncthreads();
 
@@ -216,18 +216,11 @@ __global__ void flash_forward(const half_t* q, const half_t* k, const half_t* v,
         Tensor tCrS_fp16_decay = make_tensor_like(tCrS_fp16);
         clear(tCrS_fp16_decay);
 
-//        if (thread0()) {
-//          PRINT_TENSOR("tCrS_fp16_decay", tCrS_fp16_decay);
-//        }
-		// cute::transform(diag_decay_r, tCrS_fp16, tCrS_fp16_decay, multiply_op);
 
         for (int si = 0; si < size(tCrS_fp16_decay); si++) {
             tCrS_fp16_decay(si) = diag_decay_r(si) * tCrS_fp16(si);
         }
 
-//        if (thread0()) {
-//            PRINT_TENSOR("tCrS_fp16_decay", tCrS_fp16_decay)
-//        }
 
         // Step 2: compute O_intra
         // 将tCrS_f16转换为A layout，并且进行第二个gemm的计算
@@ -245,11 +238,6 @@ __global__ void flash_forward(const half_t* q, const half_t* k, const half_t* v,
 
         cute::gemm(mma, tOrS, tOrVt, tOrO_intra);
         Tensor tOrO_intra_f16 = fp32_to_fp16(tOrO_intra);
-
-//        if (thread0()) {
-//          PRINT_TENSOR("tOrO_intra_f16", tOrO_intra_f16);
-//        }
-
 
 //
 //        // Step3: compute o_inter
