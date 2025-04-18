@@ -259,7 +259,6 @@ __global__ void flash_forward(const half_t* q, const half_t* k, const half_t* v,
 
         Tensor tBrKVt = thr_mma.partition_fragment_B(sKVt);
 
-        __syncthreads();
 
         cute::copy(tBsKVt, tBrKVt);
 
@@ -285,9 +284,6 @@ __global__ void flash_forward(const half_t* q, const half_t* k, const half_t* v,
         Tensor tCgO = thr_mma.partition_C(gO);
         cute::copy(tCrO_inter_f16, tCgO);
 
-
-//        // TODO: figure out __syncthreads()放在什么地方合适，特别注意那种需要多个view进行计算的，比如smem_kv
-        __syncthreads();
         // Step5: Update KV
         // new_kv = tl.dot(k_t, v) d x BLOCK @ d x BLOCK = d x  d
         // kv = kv * block_decay + new_kv, block_decay = 1.0
@@ -311,16 +307,11 @@ __global__ void flash_forward(const half_t* q, const half_t* k, const half_t* v,
 
 
         Tensor tCrNewKV = thr_mma.partition_fragment_C(sKV);
-        Tensor tCrNewKV_without_decay = thr_mma.partition_fragment_C(sKV);
         Tensor tCsKV = thr_mma.partition_C(sKV);
         clear(tCrNewKV);
-        clear(tCrNewKV_without_decay);
-
 
 
         cute::gemm(mma, tArKt_decay, tBrVt, tCrNewKV);
-        cute::gemm(mma, tArKt, tBrVt, tCrNewKV_without_decay);
-
 
         Tensor tCrNewKV_f16 =  fp32_to_fp16(tCrNewKV);
 
@@ -352,8 +343,6 @@ torch::Tensor forward_with_decay(torch::Tensor q, torch::Tensor k, torch::Tensor
   dim3 block = config.kThreadNum;
   dim3 grid(B * H);
   auto kernel = flash_forward<decltype(config)>;
-//  PRINT("grid", grid);
-//  PRINT("block", block);
 
   kernel<<<grid, block>>>((cute::half_t*)q.data_ptr(), (cute::half_t*)k.data_ptr(),
                                               (cute::half_t*)v.data_ptr(), (cute::half_t*)out.data_ptr(), B, H, N,
