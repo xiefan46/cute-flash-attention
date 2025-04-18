@@ -141,7 +141,7 @@ __forceinline__ __device__ auto load_decay_tensor_diag_block(const half_t* data_
 // block_decay float [H]
 template <typename config>
 __global__ void flash_forward(const half_t* q, const half_t* k, const half_t* v, half_t* o, const int B, const int H, const int N,
-                              const halt_t* q_decay,  const halt_t* k_decay,  const halt_t* diag_decay,  const float* block_decay) {
+                              const half_t* q_decay,  const half_t* k_decay,  const half_t* diag_decay,  const float* block_decay) {
     using namespace cute;
     using TiledMMA = typename config::TiledMMA;
 
