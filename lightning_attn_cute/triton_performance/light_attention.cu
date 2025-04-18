@@ -140,7 +140,8 @@ __forceinline__ __device__ auto load_decay_tensor_diag_block(const half_t* data_
 // diag_decay half [H, BLOCK, BLOCK]
 // block_decay float [H]
 template <typename config>
-__global__ void flash_forward(const half_t* q, const half_t* k, const half_t* v, half_t* o, const int B, const int H, const int N) {
+__global__ void flash_forward(const half_t* q, const half_t* k, const half_t* v, half_t* o, const int B, const int H, const int N,
+                              const halt_t* q_decay,  const halt_t* k_decay,  const halt_t* diag_decay,  const float* block_decay) {
     using namespace cute;
     using TiledMMA = typename config::TiledMMA;
 
@@ -350,13 +351,7 @@ torch::Tensor forward_with_decay(torch::Tensor q, torch::Tensor k, torch::Tensor
   int BLOCK = 64;
   int num_block = (N + BLOCK - 1) / BLOCK;
 
-  // PRINT("num_block", num_block);
 
-  auto kv_out = torch::zeros({B, H, num_block, d, d}, torch::TensorOptions().dtype(torch::kFloat32).device(torch::Device(torch::kCUDA, 0)));
-  auto kv_t_f16_out = torch::zeros({B, H, num_block, d, d}, torch::TensorOptions().dtype(torch::kFloat16).device(torch::Device(torch::kCUDA, 0)));
-  auto o_inter_out = torch::zeros({B, H, num_block, BLOCK, d}, torch::TensorOptions().dtype(torch::kFloat16).device(torch::Device(torch::kCUDA, 0)));
-  auto o_intra_out = torch::zeros({B, H, num_block, BLOCK, d}, torch::TensorOptions().dtype(torch::kFloat16).device(torch::Device(torch::kCUDA, 0)));
-  auto q_decay_out = torch::zeros({B, H, num_block, BLOCK, d}, torch::TensorOptions().dtype(torch::kFloat16).device(torch::Device(torch::kCUDA, 0)));
   auto out = torch::empty_like(q);
 
   // only for head_dim=64
@@ -368,18 +363,12 @@ torch::Tensor forward_with_decay(torch::Tensor q, torch::Tensor k, torch::Tensor
 //  PRINT("block", block);
 
   kernel<<<grid, block>>>((cute::half_t*)q.data_ptr(), (cute::half_t*)k.data_ptr(),
-                                              (cute::half_t*)v.data_ptr(), (cute::half_t*)out.data_ptr(), B, H, N, (float*)kv_out.data_ptr(),
-                                    (cute::half_t*)o_inter_out.data_ptr(), (cute::half_t*)o_intra_out.data_ptr(),(cute::half_t*)q_decay_out.data_ptr(), (cute::half_t*)kv_t_f16_out.data_ptr(),
-                                    (cute::half_t*) q_decay.data_ptr(),  (cute::half_t*) k_decay.data_ptr(),  (cute::half_t*) diag_decay.data_ptr(), (float*) block_decay.data_ptr());
+                                              (cute::half_t*)v.data_ptr(), (cute::half_t*)out.data_ptr(), B, H, N,
+                          (cute::half_t*) q_decay,  (cute::half_t*) k_decay,  (cute::half_t*) diag_decay,  (float*) block_decay);
 
 
 
   cudaDeviceSynchronize();
 
-  torch::Tensor kv_out_final = kv_out.permute({2, 0, 1, 3, 4}).contiguous();
-  torch::Tensor o_inter_out_final = o_inter_out.permute({2, 0, 1, 3, 4}).contiguous();
-  torch::Tensor o_intra_out_final = o_intra_out.permute({2, 0, 1, 3, 4}).contiguous();
-  torch::Tensor q_decay_out_final = q_decay_out.permute({2, 0, 1, 3, 4}).contiguous();
-  torch::Tensor kv_t_f16_out_final = kv_t_f16_out.permute({2, 0, 1, 3, 4}).contiguous();
   return out;
 }
